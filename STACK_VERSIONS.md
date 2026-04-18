@@ -13,7 +13,12 @@
 | prettier                   | ^3.0.0  | ^                                    | Formatter; minor updates safe                                                            |
 | typescript-eslint          | ^8.0.0  | ^                                    | TS-aware lint rules; minor updates safe within v8                                        |
 | @electron-toolkit/tsconfig | ^1.0.0  | ^                                    | Base tsconfig presets for Electron targets                                               |
+| write-file-atomic          | 7.0.1   | exact                                | Atomic JSON writes for config/layout: .tmp → fsync → rename including Windows semantics |
 | node (engines)             | 24.15.0 | exact (engines range: >=24.15.0 <25) | LTS; exact pin for runtime parity; see .nvmrc                                            |
+| node-pty                   | 1.1.0   | exact                                | Native pty for terminal lifecycle; exact pin per native-addon rule                       |
+| @parcel/watcher            | 2.5.6   | exact                                | Native file watcher; exact pin per native-addon rule                                     |
+| fix-path                   | 5.0.0   | exact                                | macOS PATH inheritance at startup; exact pin per D2                                      |
+| @electron/rebuild          | 4.0.3   | exact                                | Native-addon rebuilder; invoked by postinstall (PD-1)                                    |
 
 ## Rules
 
