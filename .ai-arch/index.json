@@ -1,0 +1,332 @@
+{
+  "project": "Atrium",
+  "created": "2026-04-15",
+  "last_updated": "2026-04-16",
+  "nodes": [
+    {
+      "slug": "canvas-ui",
+      "name": "Canvas UI",
+      "priority": "core",
+      "maturity": "ready",
+      "file": "ideas/canvas-ui.md",
+      "summary": "React Flow + dagre; shape+color per maturity (4 levels); styled connection lines per type (5 types); auto-layout on first open then user-owned; overlay div DOM structure"
+    },
+    {
+      "slug": "node-interaction",
+      "name": "Node Interaction",
+      "priority": "core",
+      "maturity": "ready",
+      "file": "ideas/node-interaction.md",
+      "summary": "Click tooltip + right-click select; context-aware toolbar (5 skills); Status/Finalize app-native; TerminalModal React component owned here, cli-engine owns lifecycle, Zustand bridges"
+    },
+    {
+      "slug": "file-state-sync",
+      "name": "File-State Sync",
+      "priority": "core",
+      "maturity": "ready",
+      "file": "ideas/file-state-sync.md",
+      "summary": "@parcel/watcher + 300ms debounce; full re-read on change; one-directional read-only; watcher lifecycle tied to project open/switch; pushes ProjectState via IPC"
+    },
+    {
+      "slug": "cli-engine",
+      "name": "CLI Engine",
+      "priority": "blocking",
+      "maturity": "ready",
+      "file": "ideas/cli-engine.md",
+      "summary": "5-state lifecycle (idle/spawning/active/exited/closing); spawn accepts string[]; terminal stays open after exit; always-visible kill; modal UI moved to renderer; health check on startup"
+    },
+    {
+      "slug": "skill-orchestration",
+      "name": "Skill Orchestration",
+      "priority": "core",
+      "maturity": "ready",
+      "file": "ideas/skill-orchestration.md",
+      "summary": "Pure composeCommand returning string[] → node-pty directly (no shell); --append-system-prompt-file for SKILL.md; path resolved at startup; fully cross-platform"
+    },
+    {
+      "slug": "cross-platform-shell",
+      "name": "Cross-Platform Shell",
+      "priority": "blocking",
+      "maturity": "ready",
+      "file": "ideas/cross-platform-shell.md",
+      "summary": "Electron + TS + React + Vite + Vitest; terminal-as-modal: xterm.js overlay div in main window, node-pty in main process, data via IPC; no separate BrowserWindow"
+    },
+    {
+      "slug": "data-layer",
+      "name": "Data Layer",
+      "priority": "blocking",
+      "maturity": "ready",
+      "file": "ideas/data-layer.md",
+      "summary": "Read-only .ai-arch/ parser; string splitting with explicit Claude-controlled-format precondition; layout in Electron userData; outputs ProjectState; free terminal button"
+    },
+    {
+      "slug": "project-launcher",
+      "name": "Project Launcher",
+      "priority": "core",
+      "maturity": "ready",
+      "file": "ideas/project-launcher.md",
+      "summary": "Two-layer: launch gate + side panel; single Open button routes via .ai-arch/ check; recents max 5 in main process; init-without-completion safe fallback; switch via switchProject with terminal guard"
+    },
+    {
+      "slug": "electron-ipc",
+      "name": "Electron IPC",
+      "priority": "blocking",
+      "maturity": "ready",
+      "file": "ideas/electron-ipc.md",
+      "summary": "Two-pattern IPC: invoke for Result<T,E> request-response, send for streaming/push; 5 namespaces; ArrayBuffer transfer; main owns parsing, pushes ProjectState; Unsubscribe pattern; TerminalId future-proofing"
+    },
+    {
+      "slug": "state-management",
+      "name": "State Management",
+      "priority": "core",
+      "maturity": "ready",
+      "file": "ideas/state-management.md",
+      "summary": "Zustand one-store + 3 slices; React Flow owns layout; diff hook reconciles; positive whitelist guard on switchProject (safe default: new states blocked); auto-dismiss on exited"
+    },
+    {
+      "slug": "build-distribution",
+      "name": "Build & Distribution",
+      "priority": "core",
+      "maturity": "ready",
+      "file": "ideas/build-distribution.md",
+      "summary": "electron-builder; NSIS/DMG-universal/AppImage+deb; SKILL.md via extraResources only (updating skills = new release); GitHub Actions matrix CI; no auto-update or code signing for v1"
+    },
+    {
+      "slug": "testing-strategy",
+      "name": "Testing Strategy",
+      "priority": "core",
+      "maturity": "ready",
+      "file": "ideas/testing-strategy.md",
+      "summary": "Unit+integration heavy, E2E surgical (3 scenarios); 8 diff hook cases; 5-state + whitelist guard unit tests; 2-path terminal integration; Vitest + Playwright; mocking boundaries defined"
+    }
+  ],
+  "connections": [
+    { "from": "cross-platform-shell", "to": "cli-engine", "type": "informs" },
+    { "from": "cross-platform-shell", "to": "skill-orchestration", "type": "informs" },
+    { "from": "cross-platform-shell", "to": "file-state-sync", "type": "informs" },
+    { "from": "cross-platform-shell", "to": "node-interaction", "type": "informs" },
+    { "from": "cross-platform-shell", "to": "electron-ipc", "type": "informs", "note": "defines the Electron process model" },
+    { "from": "cross-platform-shell", "to": "build-distribution", "type": "informs", "note": "Electron runtime gets packaged" },
+    { "from": "cross-platform-shell", "to": "testing-strategy", "type": "informs", "note": "Vitest + Playwright from this stack" },
+    { "from": "cli-engine", "to": "skill-orchestration", "type": "depends-on" },
+    { "from": "cli-engine", "to": "file-state-sync", "type": "uses", "note": "parallel systems: cli-engine runs terminal, file-state-sync detects what Claude did" },
+    { "from": "cli-engine", "to": "electron-ipc", "type": "depends-on", "note": "terminal spawn/kill/data flows through IPC" },
+    { "from": "node-interaction", "to": "cli-engine", "type": "depends-on" },
+    { "from": "node-interaction", "to": "skill-orchestration", "type": "depends-on" },
+    { "from": "node-interaction", "to": "canvas-ui", "type": "depends-on" },
+    { "from": "node-interaction", "to": "data-layer", "type": "uses" },
+    { "from": "node-interaction", "to": "project-launcher", "type": "uses", "note": "selection panel swaps with project panel" },
+    { "from": "node-interaction", "to": "state-management", "type": "depends-on", "note": "reads/writes selection, tooltip, panel state" },
+    { "from": "data-layer", "to": "file-state-sync", "type": "feeds" },
+    { "from": "data-layer", "to": "canvas-ui", "type": "feeds" },
+    { "from": "data-layer", "to": "project-launcher", "type": "feeds" },
+    { "from": "data-layer", "to": "cli-engine", "type": "uses" },
+    { "from": "project-launcher", "to": "cli-engine", "type": "uses", "note": "new project spawns terminal" },
+    { "from": "project-launcher", "to": "skill-orchestration", "type": "uses", "note": "composes init command" },
+    { "from": "project-launcher", "to": "canvas-ui", "type": "depends-on", "note": "right panel shared space" },
+    { "from": "file-state-sync", "to": "electron-ipc", "type": "depends-on", "note": "change notifications flow main→renderer" },
+    { "from": "file-state-sync", "to": "state-management", "type": "feeds", "note": "pushes re-parsed data into store" },
+    { "from": "canvas-ui", "to": "state-management", "type": "depends-on", "note": "reads node/connection data and layout from store" },
+    { "from": "state-management", "to": "electron-ipc", "type": "depends-on", "note": "IPC is the transport, store is the destination" },
+    { "from": "state-management", "to": "data-layer", "type": "uses", "note": "initial data load populates store" },
+    { "from": "build-distribution", "to": "skill-orchestration", "type": "depends-on", "note": "SKILL.md files bundled at build time" },
+    { "from": "testing-strategy", "to": "electron-ipc", "type": "uses", "note": "integration tests verify IPC contract" },
+    { "from": "testing-strategy", "to": "data-layer", "type": "uses", "note": "most unit-testable component" },
+    { "from": "testing-strategy", "to": "file-state-sync", "type": "uses", "note": "integration tests with real fs events" },
+    { "from": "data-layer", "to": "electron-ipc", "type": "feeds", "note": "data-layer output shape IS the ProjectState type that IPC transports" },
+    { "from": "project-launcher", "to": "state-management", "type": "depends-on", "note": "switchProject is the entry point for project switching" },
+    { "from": "project-launcher", "to": "electron-ipc", "type": "depends-on", "note": "project.open, project.switch, dialog.openFolder are IPC channels" },
+    { "from": "testing-strategy", "to": "cli-engine", "type": "uses", "note": "terminal lifecycle integration tests (happy path + kill + error)" },
+    { "from": "testing-strategy", "to": "skill-orchestration", "type": "uses", "note": "unit tests for command composition (4 patterns)" },
+    { "from": "testing-strategy", "to": "state-management", "type": "uses", "note": "unit tests for store actions, switchProject guard, diff hook" }
+  ],
+  "sessions": [
+    {
+      "date": "2026-04-15",
+      "skill": "init",
+      "summary": "Initial brainstorm — 9 nodes created"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "cross-platform-shell",
+      "summary": "Decided Electron + TS + React + Vite stack; discovered terminal-as-modal pattern with xterm.js + node-pty; reshaped cli-engine, skill-orchestration, file-state-sync, node-interaction, multi-node-context"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "cli-engine",
+      "summary": "Defined terminal lifecycle: startup health check, single terminal, fixed modal with fullscreen toggle, close disabled while active; refined node interaction to tooltip+skill buttons; multi-node to right-click select+panel"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "data-layer",
+      "summary": "Strictly read-only — no writes to .ai-arch/; simple string splitting for MD parsing; layout in Electron userData; free terminal button for general Claude sessions"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "project-launcher",
+      "summary": "Two-layer design: startup gate popup + persistent right-side panel on canvas; single Open button routes existing/new; new project flow with optional form fields; click recents to switch instantly"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "canvas-ui",
+      "summary": "React Flow for rendering; maturity as shape+color (gray circle → gold badge); connection lines styled+colored per type; auto-layout on first open then user-owned; name-only nodes"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "node-interaction",
+      "summary": "Added top toolbar with all 5 skills; Status/Finalize are app-rendered panels from index.json; tooltip shows Explore/Decide/Map; click outside to dismiss"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "multi-node-context",
+      "summary": "Selection panel replaces project panel; shows names + Clear button only; top toolbar context-aware — picks up selected nodes as args; no duplicate skill buttons"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "file-state-sync",
+      "summary": "@parcel/watcher for native cross-platform fs watching; debounce 200-300ms; re-read entire folder; one-directional read-only, simpler than expected"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "skill-orchestration",
+      "summary": "SKILL.md bundled with app, periodic GitHub update checks; four complete command patterns; cross-platform skill files; no output parsing"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "map",
+      "summary": "Mapped all 9 nodes; clean layered architecture (foundation → terminal → UI); merged node-interaction + multi-node-context into unified Node Interaction; added missing connections for project-launcher; no conflicts found"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "gap-analysis",
+      "summary": "Architecture review — added 4 new nodes: electron-ipc (blocking), state-management (core), build-distribution (core), testing-strategy (core); cleaned up stale multi-node-context references in connections"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "electron-ipc",
+      "summary": "Defined full IPC contract: 5 namespaces mirroring modules, standard ipcMain+webContents.send with ArrayBuffer transfer, typed Result<T,E>, Unsubscribe for listeners, main owns parsing and pushes ProjectState with markdownContent, TerminalId for future multi-terminal, MessagePort deferred"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "state-management",
+      "summary": "Chose Zustand with one store + slices; React Flow owns layout, Zustand owns domain/UI/terminal; diff logic in React hook not store; switchProject as single atomic action with terminal guard; switch blocked while terminal active"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "testing-strategy",
+      "summary": "Defined confidence bar: unit+integration heavy, E2E minimal (3 scenarios); detailed diff hook test cases including slug rename and rapid sequential updates; file watcher reclassified as integration; terminal xterm rendering as must-E2E"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "build-distribution",
+      "summary": "Chose electron-builder, universal Mac binary, SKILL.md manually managed in folder next to app (no runtime updates), no auto-update or code signing for v1; updated skill-orchestration to remove periodic update checks"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "skill-orchestration",
+      "summary": "Chose string[] arg arrays passed directly to node-pty (no shell involved); --append-system-prompt-file for SKILL.md; pure composeCommand function; skills path resolved at startup; Windows shell problem fully eliminated"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "cli-engine",
+      "summary": "5-state lifecycle with exited state for output reading; spawn accepts string[] from skill-orchestration; always-visible kill button; modal UI moved out to renderer layer; health check stays in main process"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "state-management",
+      "summary": "Synced terminal slice to cli-engine's 5-state lifecycle (added exited); switch guard changed to positive whitelist ['idle', 'exited']; switch during exited auto-dismisses terminal modal"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "explore",
+      "node": "testing-strategy",
+      "summary": "Synced to cli-engine's 5-state lifecycle; expanded state-management unit tests with all transitions + positive whitelist guard + auto-dismiss; added natural exit path to terminal integration tests"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "electron-ipc",
+      "summary": "Two-pattern transport: invoke for request-response (Result<T,E>), send for streaming/push; main-owns-parsing as security boundary; spawn takes string[]; MessagePort deferred"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "cross-platform-shell",
+      "summary": "Formalized Electron + TS + React + Vite + Vitest stack; terminal-as-modal is xterm.js overlay div in main BrowserWindow (not separate window), node-pty in main process, data via IPC"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "map",
+      "summary": "Remapped all 12 nodes; fixed cli-engine→file-state-sync direction (depends-on→uses); added 6 missing connections (data-layer→electron-ipc, project-launcher→state-management/electron-ipc, testing-strategy→cli-engine/skill-orchestration/state-management); no conflicts, no merge/split candidates"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "data-layer",
+      "summary": "String splitting with explicit Claude-controlled-format precondition; read-only confirmed; layout in userData; output shape is ProjectState; accepted risk of manual edits breaking parser"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "canvas-ui",
+      "summary": "React Flow + dagre for auto-layout; maturity as shape+color (4 levels), connections as style+color (5 types); name-only nodes; layout ownership split with state-management; overlay div DOM confirmed"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "node-interaction",
+      "summary": "Two-mode interaction (click tooltip + right-click select); context-aware toolbar; Status/Finalize app-native; explicit terminal modal ownership split — renderer owns TerminalModal component, cli-engine owns lifecycle, terminal.status in Zustand bridges"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "file-state-sync",
+      "summary": "@parcel/watcher + 300ms debounce (pinned from range); full re-read not incremental; watcher lifecycle tied to project; one-directional read-only confirmed"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "project-launcher",
+      "summary": "Two-layer (gate + panel); recents max 5 managed by main; init-without-completion: gate→gate, panel→stay; single Open button routes via .ai-arch/ check"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "state-management",
+      "summary": "Zustand one-store + 3 slices; React Flow ownership split; diff hook in rendering layer; switchProject atomic with positive whitelist guard (new states blocked by default); blocklist rejected as unsafe"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "build-distribution",
+      "summary": "electron-builder + GitHub Actions matrix CI; SKILL.md via extraResources only (no runtime updates); resolveSkillsPath() at startup; updating skills = new release; v1 excludes auto-update and code signing"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "decide",
+      "node": "testing-strategy",
+      "summary": "Unit+integration heavy, E2E surgical (3 scenarios); 8 diff hook cases pinned; 5-state + whitelist guard tests; 2-path terminal integration (happy + kill); Vitest + Playwright; mocking boundaries defined"
+    },
+    {
+      "date": "2026-04-16",
+      "skill": "finalize",
+      "summary": "All 12 nodes advanced to ready; 6 feature briefs generated (scaffolding → IPC+data → terminal → state+canvas → interaction+UX → build); todo-list.md created with dependency chain"
+    }
+  ]
+}
