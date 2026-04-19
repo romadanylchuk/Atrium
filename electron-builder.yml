@@ -17,6 +17,9 @@ asarUnpack:
   - "**/@parcel/watcher*/**"
   - "**/*.node"
 
+# Both node-pty and @parcel/watcher ship NAPI-stable prebuilts; no source rebuild needed.
+npmRebuild: false
+
 extraResources:
   - from: .claude/skills
     to: skills
@@ -25,6 +28,8 @@ win:
   target: nsis
   artifactName: Terminus-${version}-win-${arch}.${ext}
   icon: build/icon.ico
+  # Skip signing for local --dir smoke builds (no cert available in v1)
+  signAndEditExecutable: false
 
 nsis:
   oneClick: false
