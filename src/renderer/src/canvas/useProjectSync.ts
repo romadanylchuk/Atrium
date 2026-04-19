@@ -19,10 +19,18 @@ export function useProjectSync(params: UseProjectSyncParams): void {
   // Track previous RF node list to diff against
   const prevNodesRef = useRef<RFNode[]>([]);
   // Warning tracker: reset on projectHash change
-  const warnTrackerRef = useRef<{ hash: string; maturity: Set<string>; connType: Set<string> }>({
+  const warnTrackerRef = useRef<{
+    hash: string;
+    maturity: Set<string>;
+    connType: Set<string>;
+    staleLayoutSlugs: Set<string>;
+    seedApplied: boolean;
+  }>({
     hash: '',
     maturity: new Set(),
     connType: new Set(),
+    staleLayoutSlugs: new Set(),
+    seedApplied: false,
   });
 
   useEffect(() => {
@@ -39,6 +47,8 @@ export function useProjectSync(params: UseProjectSyncParams): void {
       tracker.hash = project.projectHash;
       tracker.maturity = new Set();
       tracker.connType = new Set();
+      tracker.staleLayoutSlugs = new Set();
+      tracker.seedApplied = false;
     }
 
     const prevNodes = prevNodesRef.current;
@@ -68,12 +78,22 @@ export function useProjectSync(params: UseProjectSyncParams): void {
       }
     }
 
-    // Seed positions from layout:load (first project-open)
-    if (seedPositions) {
+    // First pass for this projectHash: seeds overwrite existing (which may be dagre from an
+    // empty-seed first render). Only flip seedApplied when seeds are non-empty so the two-render
+    // flow (Canvas mounts sync, layout.load resolves async) still wins on the populated pass.
+    if (seedPositions && !tracker.seedApplied) {
       for (const [slug, pos] of seedPositions) {
-        if (!existingPositions.has(slug)) {
-          existingPositions.set(slug, pos);
+        if (!nextSlugs.has(slug)) {
+          if (!tracker.staleLayoutSlugs.has(slug)) {
+            tracker.staleLayoutSlugs.add(slug);
+            console.warn(`[atrium] Stale layout slug dropped: "${slug}"`);
+          }
+          continue;
         }
+        existingPositions.set(slug, pos);
+      }
+      if (seedPositions.size > 0) {
+        tracker.seedApplied = true;
       }
     }
 
