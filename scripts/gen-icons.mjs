@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Generates placeholder "T" icons in build/ for electron-builder.
+// Generates placeholder "A" icons in build/ for electron-builder.
 // Run: npm run icons
 // Output files are committed; this script is for regeneration only.
 
@@ -20,7 +20,7 @@ const png2icons = require('png2icons');
 
 const SIZE = 1024;
 
-// SVG "T" on dark background
+// SVG "A" on dark background
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}">
   <rect width="${SIZE}" height="${SIZE}" fill="#1e1e1e"/>
   <text
@@ -31,7 +31,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${S
     font-weight="bold"
     font-size="${Math.round(SIZE * 0.72)}"
     fill="#e0e0e0"
-  >T</text>
+  >A</text>
 </svg>`;
 
 const pngPath = path.join(buildDir, 'icon.png');
