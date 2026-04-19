@@ -24,6 +24,7 @@ export interface IpcMainLike {
     channel: string,
     listener: (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<unknown>,
   ): void;
+  on(channel: string, listener: (...args: unknown[]) => void): void;
 }
 
 // ---------------------------------------------------------------------------

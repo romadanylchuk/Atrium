@@ -16,6 +16,7 @@ import {
   saveAppConfig,
   bumpRecent,
   getRecents,
+  pruneRecent,
   CURRENT_CONFIG_VERSION,
 } from '../appConfig.js';
 
@@ -223,6 +224,39 @@ describe('getRecents', () => {
   it('returns empty array when no config exists', async () => {
     const recents = await getRecents();
     expect(recents).toEqual([]);
+  });
+});
+
+describe('pruneRecent', () => {
+  it('removes the matching path when present', async () => {
+    await bumpRecent('/path/a', 'A', new Date());
+    await bumpRecent('/path/b', 'B', new Date());
+    await pruneRecent('/path/a');
+    const recents = await getRecents();
+    expect(recents).toHaveLength(1);
+    expect(recents[0]?.path).toBe('/path/b');
+  });
+
+  it('is a no-op when path is absent', async () => {
+    await bumpRecent('/path/a', 'A', new Date());
+    await pruneRecent('/path/z');
+    const recents = await getRecents();
+    expect(recents).toHaveLength(1);
+    expect(recents[0]?.path).toBe('/path/a');
+  });
+
+  it('pruneRecent no-ops when appConfig read errors cause defaults (fs.readFile throws EACCES)', async () => {
+    // loadAppConfig is contractually never-throws — on EACCES it warns and returns defaults.
+    // pruneRecent delegates to loadAppConfig; when defaults are returned the recents list is
+    // empty so the path filter finds nothing and no save is attempted.
+    const fsMod = await import('node:fs');
+    const spy = vi.spyOn(fsMod.promises, 'readFile').mockRejectedValueOnce(
+      Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }),
+    );
+    await pruneRecent('/path/a');
+    // loadAppConfig emits a warn for the unreadable file.
+    expect(console.warn).toHaveBeenCalled();
+    spy.mockRestore();
   });
 });
 

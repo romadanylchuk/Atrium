@@ -52,7 +52,7 @@ function makeExecFileFailure() {
 // Tests — all use vi.resetModules + vi.doMock for isolation
 // ---------------------------------------------------------------------------
 
-describe('checkClaude — happy path (trailing newline preserved)', () => {
+describe('checkClaude — happy path (ANSI stripped, trimmed)', () => {
   let fakePty: FakeIPty;
 
   beforeEach(() => {
@@ -67,7 +67,7 @@ describe('checkClaude — happy path (trailing newline preserved)', () => {
     vi.resetModules();
   });
 
-  it('returns ok with full version string including trailing newline', async () => {
+  it('returns ok with version string trimmed (trailing newline stripped)', async () => {
     const { checkClaude } = await import('../healthCheck.js');
     const promise = checkClaude();
     // Yield so execFile callback and pty handlers are wired
@@ -78,7 +78,7 @@ describe('checkClaude — happy path (trailing newline preserved)', () => {
     const result = await promise;
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.version).toBe('1.4.0\n');
+    expect(result.data.version).toBe('1.4.0');
     expect(result.data.claudePath).toMatch(/.+/);
   });
 });

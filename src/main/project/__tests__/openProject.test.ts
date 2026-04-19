@@ -16,6 +16,8 @@ import { __setUserDataDirForTests } from '@main/storage';
 import * as storageModule from '@main/storage';
 import { openProject, readAndAssembleProject } from '../openProject';
 import { ProjectErrorCode } from '@shared/errors';
+import { hashKeyOnly } from '@main/storage/projectHash.js';
+
 
 // ---------------------------------------------------------------------------
 // Setup / teardown
@@ -59,6 +61,7 @@ describe('openProject', () => {
       if (!result.ok) return;
       expect(result.data.projectName).toBe('Atrium');
       expect(result.data.nodes.length).toBeGreaterThan(0);
+      expect(result.data.projectHash).toBe(hashKeyOnly(REPO_ROOT));
     });
 
     it('returns zero warnings (all idea files are present in repo)', async () => {
@@ -180,5 +183,74 @@ describe('openProject', () => {
       if (result.ok) return;
       expect(result.error.code).toBe(ProjectErrorCode.READ_FAILED);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Recents pruning integration
+// ---------------------------------------------------------------------------
+
+describe('openProject — recents pruning', () => {
+  it('success does NOT call pruneRecent', async () => {
+    const pruneSpy = vi.spyOn(storageModule, 'pruneRecent').mockResolvedValue(undefined);
+
+    const result = await openProject(REPO_ROOT);
+    expect(result.ok).toBe(true);
+    expect(pruneSpy).not.toHaveBeenCalled();
+  });
+
+  it('ENOENT (truly non-existent path) triggers pruneRecent on linux', async () => {
+    const pruneSpy = vi.spyOn(storageModule, 'pruneRecent').mockResolvedValue(undefined);
+
+    const nonExistent = nodePath.join(os.tmpdir(), `atrium-nope-${Date.now()}`);
+    const result = await openProject(nonExistent, 'linux');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe(ProjectErrorCode.PATH_NOT_FOUND);
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(pruneSpy).toHaveBeenCalledWith(nonExistent);
+  });
+
+  it('ENOENT (truly non-existent path) triggers pruneRecent on win32', async () => {
+    const pruneSpy = vi.spyOn(storageModule, 'pruneRecent').mockResolvedValue(undefined);
+
+    const nonExistent = nodePath.join(os.tmpdir(), `atrium-nope-${Date.now()}`);
+    const result = await openProject(nonExistent, 'win32');
+    expect(result.ok).toBe(false);
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(pruneSpy).toHaveBeenCalledWith(nonExistent);
+  });
+
+  it('NOT_AN_ARCH_PROJECT (not a poisoning error) does NOT trigger pruneRecent', async () => {
+    const pruneSpy = vi.spyOn(storageModule, 'pruneRecent').mockResolvedValue(undefined);
+
+    // tmpDir exists but has no .ai-arch/ — produces NOT_AN_ARCH_PROJECT, not PATH_NOT_FOUND
+    const result = await openProject(tmpDir, 'linux');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe(ProjectErrorCode.NOT_AN_ARCH_PROJECT);
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(pruneSpy).not.toHaveBeenCalled();
+  });
+
+  it('platform injected as linux — classifier uses linux rules (ENOENT prunes)', async () => {
+    const pruneSpy = vi.spyOn(storageModule, 'pruneRecent').mockResolvedValue(undefined);
+    const nonExistent = nodePath.join(os.tmpdir(), `atrium-linux-${Date.now()}`);
+
+    await openProject(nonExistent, 'linux');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(pruneSpy).toHaveBeenCalledWith(nonExistent);
+  });
+
+  it('platform injected as win32 — ENOENT still prunes (win32 ENOENT is always poisoning)', async () => {
+    const pruneSpy = vi.spyOn(storageModule, 'pruneRecent').mockResolvedValue(undefined);
+    const nonExistent = nodePath.join(os.tmpdir(), `atrium-win32-${Date.now()}`);
+
+    await openProject(nonExistent, 'win32');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(pruneSpy).toHaveBeenCalledWith(nonExistent);
   });
 });

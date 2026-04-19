@@ -27,6 +27,7 @@ describe('assembleProjectState', () => {
 
     const state = assembleProjectState({
       rootPath: '/test/project',
+      projectHash: 'testhash',
       index,
       ideaFiles,
       contextMD,
@@ -62,6 +63,7 @@ describe('assembleProjectState', () => {
 
     const state = assembleProjectState({
       rootPath: '/test',
+      projectHash: 'testhash',
       index: indexResult.data,
       ideaFiles: new Map(),
       contextMD: null,
@@ -83,6 +85,7 @@ describe('assembleProjectState', () => {
     // Pass no idea files — all nodes should get MISSING_IDEA_FILE warnings
     const state = assembleProjectState({
       rootPath: '/test',
+      projectHash: 'testhash',
       index: indexResult.data,
       ideaFiles: new Map(),
       contextMD: null,
@@ -101,6 +104,7 @@ describe('assembleProjectState', () => {
 
     const state = assembleProjectState({
       rootPath: '/test',
+      projectHash: 'testhash',
       index: indexResult.data,
       ideaFiles: new Map(),
       contextMD: null,
@@ -119,6 +123,7 @@ describe('assembleProjectState', () => {
 
     const state = assembleProjectState({
       rootPath: '/test',
+      projectHash: 'testhash',
       index: indexResult.data,
       ideaFiles: new Map(),
       contextMD: null,
@@ -137,6 +142,7 @@ describe('assembleProjectState', () => {
 
     const state = assembleProjectState({
       rootPath: '/test',
+      projectHash: 'testhash',
       index: indexResult.data,
       ideaFiles: new Map(),
       contextMD: fixture('project-context.md'),

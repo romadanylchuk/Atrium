@@ -48,7 +48,7 @@ function wait(ms: number): Promise<void> {
 describe('WatcherManager — burst collapses', () => {
   let tmpDir: string;
   let manager: WatcherManager;
-  const fakeState = { nodes: [], edges: [] } as unknown as import('@shared/domain').ProjectState;
+  const fakeState = { nodes: [], edges: [], projectHash: 'testhash' } as unknown as import('@shared/domain').ProjectState;
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'atrium-test-'));

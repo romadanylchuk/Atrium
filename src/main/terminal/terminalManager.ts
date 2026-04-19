@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { BrowserWindow } from 'electron';
+import { app } from 'electron';
 import { spawn as ptySpawn, type IPty } from 'node-pty';
 import type { TerminalId } from '@shared/domain';
 import { TerminalErrorCode } from '@shared/errors';
@@ -40,9 +41,16 @@ export class TerminalManager {
 
     this.#transition('spawning');
 
+    // E2E override: replace the first arg (the claude binary) with the fixture.
+    const e2eBin = process.env['ATRIUM_E2E_CLAUDE_BIN'];
+    const spawnArgs =
+      e2eBin && process.env['NODE_ENV'] !== 'production' && !app.isPackaged
+        ? [e2eBin, ...args.slice(1)]
+        : args;
+
     let pty: IPty;
     try {
-      pty = ptySpawn(args[0]!, args.slice(1), {
+      pty = ptySpawn(spawnArgs[0]!, spawnArgs.slice(1), {
         cwd,
         env: process.env as Record<string, string>,
         cols: 120,

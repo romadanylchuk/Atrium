@@ -18,6 +18,7 @@ import type { ProjectState, NodeData, ParseWarning } from '@shared/domain';
 
 export type AssembleInput = {
   readonly rootPath: string;
+  readonly projectHash: string;
   readonly index: ParsedIndex;
   /** Map of relative file path (e.g. "ideas/canvas-ui.md") → raw markdown string. */
   readonly ideaFiles: Map<string, string>;
@@ -34,7 +35,7 @@ export type AssembleInput = {
  * Assemble a `ProjectState` from the parsed index, idea file contents, and context.
  */
 export function assembleProjectState(input: AssembleInput): ProjectState {
-  const { rootPath, index, ideaFiles, contextMD, extraWarnings = [] } = input;
+  const { rootPath, projectHash, index, ideaFiles, contextMD, extraWarnings = [] } = input;
   const allWarnings: ParseWarning[] = [...index.warnings, ...extraWarnings];
 
   // --- Parse project context ---
@@ -81,6 +82,7 @@ export function assembleProjectState(input: AssembleInput): ProjectState {
   return {
     rootPath,
     projectName: index.project,
+    projectHash,
     created: index.created,
     lastUpdated: index.last_updated,
     context,

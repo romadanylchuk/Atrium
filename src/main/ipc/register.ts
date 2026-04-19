@@ -15,6 +15,8 @@ import { registerDialogHandlers } from './dialog';
 import { registerFileSyncHandlers } from './fileSync';
 import { registerTerminalHandlers } from './terminal';
 import { registerHealthHandlers } from './health';
+import { registerLayoutHandlers } from './layout';
+import { registerSkillHandlers } from './skill';
 import { TerminalManager } from '@main/terminal';
 import { WatcherManager } from '@main/fileSync';
 
@@ -46,4 +48,6 @@ export function registerIpc(
   registerFileSyncHandlers(watcherManager);
   registerTerminalHandlers(terminalManager);
   registerHealthHandlers();
+  registerLayoutHandlers();
+  registerSkillHandlers(terminalManager);
 }

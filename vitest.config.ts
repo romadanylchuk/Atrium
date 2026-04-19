@@ -12,6 +12,9 @@ const alias = {
 
 export default defineConfig({
   resolve: { alias },
+  // __ATRIUM_E2E__ is a Vite build-time constant. Define it here so unit tests
+  // resolve the identifier (always false in the unit-test environment).
+  define: { __ATRIUM_E2E__: 'false' },
   test: {
     projects: [
       {
@@ -30,6 +33,7 @@ export default defineConfig({
           name: 'renderer',
           include: ['src/renderer/**/*.test.{ts,tsx}'],
           environment: 'jsdom',
+          setupFiles: ['./vitest.renderer.setup.ts'],
         },
       },
     ],

@@ -61,6 +61,7 @@ function flattenIpc(): string[] {
 //   terminal:onData    — webContents.send, no ipcMain registration
 //   terminal:onExit    — webContents.send, no ipcMain registration
 //   terminal:onError   — webContents.send, no ipcMain registration
+//
 const PUSH_ONLY_CHANNELS = new Set<string>([
   IPC.fileSync.onChanged,
   IPC.terminal.onData,
@@ -156,6 +157,9 @@ describe('registerIpc', () => {
       IPC.terminal.spawn,
       IPC.terminal.kill,
       IPC.health.checkClaude,
+      IPC.layout.load,
+      IPC.layout.save,
+      IPC.skill.spawn,
     ];
 
     for (const ch of invokeChannels) {
@@ -169,5 +173,6 @@ describe('registerIpc', () => {
 
     expect(onMap.has(IPC.terminal.write)).toBe(true);
     expect(onMap.has(IPC.terminal.resize)).toBe(true);
+    expect(onMap.has(IPC.layout.saveSnapshot)).toBe(true);
   });
 });

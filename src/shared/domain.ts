@@ -93,6 +93,7 @@ export type ProjectContext = {
 export type ProjectState = {
   readonly rootPath: string;
   readonly projectName: string;
+  readonly projectHash: string;
   readonly created?: string;
   readonly lastUpdated?: string;
   readonly context: ProjectContext;

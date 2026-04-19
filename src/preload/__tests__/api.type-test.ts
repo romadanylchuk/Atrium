@@ -20,6 +20,9 @@ import type {
   HealthInfo,
   HealthErrorCode,
   RecentProject,
+  LayoutFileV1,
+  LayoutErrorCode,
+  SkillErrorCode,
 } from '@shared/index';
 
 // ---------------------------------------------------------------------------
@@ -120,6 +123,33 @@ test('AtriumAPI.terminal.onExit accepts id + exit-code callback and returns unsu
 test('AtriumAPI.health.checkClaude returns Promise<Result<HealthInfo, HealthErrorCode>>', () => {
   expectTypeOf<AtriumAPI['health']['checkClaude']>()
     .returns.resolves.toEqualTypeOf<Result<HealthInfo, HealthErrorCode>>();
+});
+
+// ---------------------------------------------------------------------------
+// layout namespace
+// ---------------------------------------------------------------------------
+
+test('AtriumAPI.layout.load returns Promise<Result<LayoutFileV1 | null, LayoutErrorCode>>', () => {
+  expectTypeOf<AtriumAPI['layout']['load']>()
+    .returns.resolves.toEqualTypeOf<Result<LayoutFileV1 | null, LayoutErrorCode>>();
+});
+
+test('AtriumAPI.layout.save returns Promise<Result<void, LayoutErrorCode>>', () => {
+  expectTypeOf<AtriumAPI['layout']['save']>()
+    .returns.resolves.toEqualTypeOf<Result<void, LayoutErrorCode>>();
+});
+
+test('AtriumAPI.layout.saveSnapshot is void', () => {
+  expectTypeOf<AtriumAPI['layout']['saveSnapshot']>().returns.toEqualTypeOf<void>();
+});
+
+// ---------------------------------------------------------------------------
+// skill namespace
+// ---------------------------------------------------------------------------
+
+test('AtriumAPI.skill.spawn returns Promise<Result<TerminalId, SkillErrorCode>>', () => {
+  expectTypeOf<AtriumAPI['skill']['spawn']>()
+    .returns.resolves.toEqualTypeOf<Result<TerminalId, SkillErrorCode>>();
 });
 
 // ---------------------------------------------------------------------------

@@ -47,6 +47,9 @@ export function makeSimpleFakeIpcMain(): SimpleFakeIpcMain {
     handle(channel: string, listener: InvokeHandler): void {
       handlers.set(channel, listener);
     },
+    on(): void {
+      // no-op — simple fake only needs handle
+    },
   };
 
   const invoke = async (channel: string, ...args: unknown[]): Promise<unknown> => {

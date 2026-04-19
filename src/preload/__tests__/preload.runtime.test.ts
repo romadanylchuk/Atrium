@@ -257,6 +257,83 @@ describe('ArrayBuffer round-trip fidelity', () => {
 });
 
 // ---------------------------------------------------------------------------
+// layout namespace runtime shape
+// ---------------------------------------------------------------------------
+
+describe('layout namespace — runtime shape', () => {
+  it('window.atrium.layout.load is a function', async () => {
+    await ensurePreloadImported();
+    const layoutApi = capturedApi!['layout'] as Record<string, unknown>;
+    expect(typeof layoutApi['load']).toBe('function');
+  });
+
+  it('window.atrium.layout.save is a function', async () => {
+    await ensurePreloadImported();
+    const layoutApi = capturedApi!['layout'] as Record<string, unknown>;
+    expect(typeof layoutApi['save']).toBe('function');
+  });
+
+  it('window.atrium.layout.saveSnapshot is a function', async () => {
+    await ensurePreloadImported();
+    const layoutApi = capturedApi!['layout'] as Record<string, unknown>;
+    expect(typeof layoutApi['saveSnapshot']).toBe('function');
+  });
+
+  it('layout.load calls ipcRenderer.invoke with IPC.layout.load', async () => {
+    await ensurePreloadImported();
+    mockInvoke.mockClear();
+
+    const layoutApi = capturedApi!['layout'] as { load: (hash: string) => Promise<unknown> };
+    void layoutApi.load('deadbeef');
+
+    expect(mockInvoke).toHaveBeenCalledOnce();
+    const calls = mockInvoke.mock.calls as unknown[][];
+    expect(calls[0]![0]).toBe(IPC.layout.load);
+    expect(calls[0]![1]).toBe('deadbeef');
+  });
+
+  it('layout.saveSnapshot calls ipcRenderer.send with IPC.layout.saveSnapshot', async () => {
+    await ensurePreloadImported();
+    mockSend.mockClear();
+    mockInvoke.mockClear();
+
+    const layout = { schemaVersion: 1 as const, projectPath: '/x', nodePositions: {} };
+    const layoutApi = capturedApi!['layout'] as {
+      saveSnapshot: (hash: string, data: typeof layout) => void;
+    };
+    layoutApi.saveSnapshot('deadbeef', layout);
+
+    expect(mockSend).toHaveBeenCalledOnce();
+    const calls = mockSend.mock.calls as unknown[][];
+    expect(calls[0]![0]).toBe(IPC.layout.saveSnapshot);
+    expect(calls[0]![1]).toBe('deadbeef');
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// skill namespace runtime shape
+// ---------------------------------------------------------------------------
+
+describe('skill namespace — runtime shape', () => {
+  it('window.atrium.skill.spawn invokes IPC.skill.spawn once with the request payload', async () => {
+    await ensurePreloadImported();
+    mockInvoke.mockClear();
+
+    const skillApi = capturedApi!['skill'] as {
+      spawn: (req: Record<string, unknown>) => Promise<unknown>;
+    };
+    const req = { skill: 'explore', nodes: ['canvas-ui'], cwd: '/p' };
+    void skillApi.spawn(req);
+
+    expect(mockInvoke).toHaveBeenCalledOnce();
+    const calls = mockInvoke.mock.calls as unknown[][];
+    expect(calls[0]![0]).toBe(IPC.skill.spawn);
+    expect(calls[0]![1]).toBe(req);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // send vs invoke dispatch
 // ---------------------------------------------------------------------------
 

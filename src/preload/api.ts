@@ -20,7 +20,11 @@ import type {
   HealthInfo,
   HealthErrorCode,
   RecentProject,
+  LayoutFileV1,
+  LayoutErrorCode,
+  SkillErrorCode,
 } from '@shared/index';
+import type { SkillSpawnRequest } from '@shared/skill/spawn';
 
 export type AtriumAPI = {
   project: {
@@ -47,6 +51,14 @@ export type AtriumAPI = {
   };
   health: {
     checkClaude(): Promise<Result<HealthInfo, HealthErrorCode>>;
+  };
+  layout: {
+    load(projectHash: string): Promise<Result<LayoutFileV1 | null, LayoutErrorCode>>;
+    save(projectHash: string, data: LayoutFileV1): Promise<Result<void, LayoutErrorCode>>;
+    saveSnapshot(projectHash: string, data: LayoutFileV1): void;
+  };
+  skill: {
+    spawn(req: SkillSpawnRequest): Promise<Result<TerminalId, SkillErrorCode>>;
   };
 };
 

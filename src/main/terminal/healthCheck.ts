@@ -7,6 +7,7 @@
  */
 import { execFile } from 'node:child_process';
 import { spawn as ptySpawn } from 'node-pty';
+import { app } from 'electron';
 import { ok, err } from '@shared/result.js';
 import { HealthErrorCode } from '@shared/errors.js';
 import type { Result } from '@shared/result.js';
@@ -48,10 +49,17 @@ function resolveBinaryPath(): Promise<string> {
 
 export async function checkClaude(): Promise<Result<HealthInfo, typeof HealthErrorCode[keyof typeof HealthErrorCode]>> {
   let claudePath: string;
-  try {
-    claudePath = await resolveBinaryPath();
-  } catch {
-    return err(HealthErrorCode.CLAUDE_NOT_FOUND, "'claude' not on PATH — check your installation");
+
+  // E2E override: use the injected binary path directly, skip PATH resolution.
+  const e2eBin = process.env['ATRIUM_E2E_CLAUDE_BIN'];
+  if (e2eBin && process.env['NODE_ENV'] !== 'production' && !app.isPackaged) {
+    claudePath = e2eBin;
+  } else {
+    try {
+      claudePath = await resolveBinaryPath();
+    } catch {
+      return err(HealthErrorCode.CLAUDE_NOT_FOUND, "'claude' not on PATH — check your installation");
+    }
   }
 
   return new Promise((resolve) => {
@@ -87,12 +95,15 @@ export async function checkClaude(): Promise<Result<HealthInfo, typeof HealthErr
         return;
       }
 
-      if (!/\d+\.\d+\.\d+/.test(buffer)) {
+      // Strip ANSI/VT100 escape sequences before parsing and returning.
+      const clean = buffer.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\x1b\][^\x07]*\x07/g, '').trim();
+
+      if (!/\d+\.\d+\.\d+/.test(clean)) {
         resolve(err(HealthErrorCode.VERSION_UNPARSEABLE, `could not parse version; claude path: ${claudePath}`));
         return;
       }
 
-      resolve(ok({ claudePath, version: buffer }));
+      resolve(ok({ claudePath, version: clean }));
     });
   });
 }

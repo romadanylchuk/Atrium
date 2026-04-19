@@ -74,6 +74,20 @@ export const TerminalErrorCode = {
 export type TerminalErrorCode = (typeof TerminalErrorCode)[keyof typeof TerminalErrorCode];
 
 // ---------------------------------------------------------------------------
+// Layout
+// ---------------------------------------------------------------------------
+
+export const LayoutErrorCode = {
+  ...CommonErrorCode,
+  NOT_FOUND: 'NOT_FOUND',
+  CORRUPT: 'CORRUPT',
+  SCHEMA_MISMATCH: 'SCHEMA_MISMATCH',
+  IO_FAILED: 'IO_FAILED',
+} as const;
+
+export type LayoutErrorCode = (typeof LayoutErrorCode)[keyof typeof LayoutErrorCode];
+
+// ---------------------------------------------------------------------------
 // Health
 // ---------------------------------------------------------------------------
 
@@ -85,3 +99,16 @@ export const HealthErrorCode = {
 } as const;
 
 export type HealthErrorCode = (typeof HealthErrorCode)[keyof typeof HealthErrorCode];
+
+// ---------------------------------------------------------------------------
+// Skill
+// ---------------------------------------------------------------------------
+
+export const SkillErrorCode = {
+  ...CommonErrorCode,
+  COMPOSE_FAILED: 'COMPOSE_FAILED',
+  SPAWN_FAILED: 'SPAWN_FAILED',
+  INVALID_SKILL: 'INVALID_SKILL',
+} as const;
+
+export type SkillErrorCode = (typeof SkillErrorCode)[keyof typeof SkillErrorCode];

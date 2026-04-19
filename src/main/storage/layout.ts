@@ -12,24 +12,11 @@ import * as nodePath from 'node:path';
 import { atomicWriteJson } from './atomicWrite.js';
 import { getLayoutPath, getProjectDir } from './paths.js';
 import { hashKeyOnly } from './projectHash.js';
+import type { LayoutFileV1, NodePosition, Viewport } from '@shared/layout.js';
+import { type Result, ok, err } from '@shared/result.js';
+import { LayoutErrorCode } from '@shared/errors.js';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type NodePosition = { x: number; y: number };
-
-export type Viewport = { x: number; y: number; zoom: number };
-
-export type LayoutFileV1 = {
-  schemaVersion: 1;
-  /** Absolute path to the project root — used for orphan detection. */
-  projectPath: string;
-  /** Map from node slug to canvas position. */
-  nodePositions: Record<string, NodePosition>;
-  /** Optional saved viewport (pan + zoom). */
-  viewport?: Viewport;
-};
+export type { LayoutFileV1, NodePosition, Viewport };
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -126,6 +113,97 @@ export async function saveLayout(projectAbsPath: string, data: LayoutFileV1): Pr
   await fs.promises.mkdir(projectDir, { recursive: true });
   const layoutPath = getLayoutPath(hash);
   await atomicWriteJson(layoutPath, data);
+}
+
+/**
+ * Load the layout file by project hash.
+ *
+ * Returns `ok(null)` when no file exists yet (first-run).
+ * Returns `err('CORRUPT')` + quarantines on JSON parse failure or invalid shape.
+ * Returns `err('SCHEMA_MISMATCH')` when `schemaVersion` is an integer ≠ 1 — file is left untouched.
+ * Returns `err('IO_FAILED')` on any other read/filesystem error.
+ */
+export async function loadLayoutByHash(
+  hash: string,
+): Promise<Result<LayoutFileV1 | null, LayoutErrorCode>> {
+  const layoutPath = getLayoutPath(hash);
+
+  let raw: string;
+  try {
+    raw = await fs.promises.readFile(layoutPath, 'utf8');
+  } catch (e) {
+    const nodeErr = e as NodeJS.ErrnoException;
+    if (nodeErr.code === 'ENOENT') {
+      return ok(null);
+    }
+    return err(LayoutErrorCode.IO_FAILED, nodeErr.message);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    const quarantinePath = `${layoutPath}.corrupt-${isoUtcNow()}`;
+    try {
+      await fs.promises.rename(layoutPath, quarantinePath);
+    } catch {
+      // quarantine best-effort
+    }
+    return err(LayoutErrorCode.CORRUPT, `JSON parse error: ${(e as Error).message}`);
+  }
+
+  if (typeof parsed !== 'object' || parsed === null) {
+    const quarantinePath = `${layoutPath}.corrupt-${isoUtcNow()}`;
+    try {
+      await fs.promises.rename(layoutPath, quarantinePath);
+    } catch {
+      // quarantine best-effort
+    }
+    return err(LayoutErrorCode.CORRUPT, 'Layout file is not an object');
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  const version = obj['schemaVersion'];
+
+  if (typeof version === 'number' && Number.isInteger(version) && version !== CURRENT_LAYOUT_VERSION) {
+    return err(
+      LayoutErrorCode.SCHEMA_MISMATCH,
+      `Expected schemaVersion ${CURRENT_LAYOUT_VERSION}, got ${version}`,
+    );
+  }
+
+  if (!isValidLayout(parsed)) {
+    const quarantinePath = `${layoutPath}.corrupt-${isoUtcNow()}`;
+    try {
+      await fs.promises.rename(layoutPath, quarantinePath);
+    } catch {
+      // quarantine best-effort
+    }
+    return err(LayoutErrorCode.CORRUPT, 'Layout file has invalid shape');
+  }
+
+  return ok(parsed);
+}
+
+/**
+ * Atomically persist a layout file keyed by project hash.
+ * Creates the project directory if it doesn't exist.
+ *
+ * Returns `err('IO_FAILED')` on any filesystem error.
+ */
+export async function saveLayoutByHash(
+  hash: string,
+  data: LayoutFileV1,
+): Promise<Result<void, LayoutErrorCode>> {
+  try {
+    const projectDir = getProjectDir(hash);
+    await fs.promises.mkdir(projectDir, { recursive: true });
+    const layoutPath = getLayoutPath(hash);
+    await atomicWriteJson(layoutPath, data);
+    return ok(undefined);
+  } catch (e) {
+    return err(LayoutErrorCode.IO_FAILED, (e as Error).message);
+  }
 }
 
 /**

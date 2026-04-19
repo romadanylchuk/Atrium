@@ -259,3 +259,13 @@ export async function getRecents(): Promise<RecentProject[]> {
   const cfg = await loadAppConfig();
   return cfg.recents;
 }
+
+/**
+ * Remove a path from the recents list. No-op if not present.
+ */
+export async function pruneRecent(projectPath: string): Promise<void> {
+  const cfg = await loadAppConfig();
+  const filtered = cfg.recents.filter((r) => r.path !== projectPath);
+  if (filtered.length === cfg.recents.length) return;
+  await saveAppConfig({ ...cfg, recents: filtered });
+}

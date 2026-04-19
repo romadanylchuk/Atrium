@@ -7,3 +7,6 @@ out/
 .env
 .serena/
 .claude/scheduled_tasks.lock
+.flow-spec/
+playwright-report/
+test-results/

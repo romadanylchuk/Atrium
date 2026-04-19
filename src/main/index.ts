@@ -7,8 +7,11 @@ import { getProjectsDir } from '@main/storage';
 import { TerminalManager } from '@main/terminal';
 import { WatcherManager } from '@main/fileSync';
 import { readAndAssembleProject } from '@main/project';
+import { flushLayoutBuffer } from '@main/ipc/flushLayoutBuffer';
 
 applyFixPath();
+
+export { flushLayoutBuffer };
 
 const watcherReparseAdapter = async (dir: string) => {
   const projectRoot = path.dirname(dir);
@@ -46,7 +49,8 @@ function createMainWindow(): BrowserWindow {
 
   win.once('ready-to-show', () => {
     win.show();
-    if (IS_DEV) {
+    // Skip devtools in E2E to avoid Playwright picking up the devtools window as firstWindow().
+    if (IS_DEV && !process.env['ATRIUM_E2E_CLAUDE_BIN']) {
       win.webContents.openDevTools({ mode: 'detach' });
     }
   });
@@ -104,5 +108,15 @@ if (!gotLock) {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
     }
+  });
+
+  let flushedOnce = false;
+  app.on('before-quit', (event) => {
+    if (flushedOnce) return;
+    flushedOnce = true;
+    event.preventDefault();
+    flushLayoutBuffer()
+      .catch((err: unknown) => console.warn('[atrium:quit] layout flush failed:', err))
+      .finally(() => app.exit());
   });
 }

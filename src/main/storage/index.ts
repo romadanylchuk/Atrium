@@ -6,7 +6,7 @@
  *   import { hashProjectPath, hashKeyOnly, slugify, normalizePath } from '@main/storage';
  *   import { atomicWriteJson } from '@main/storage';
  *   import { loadAppConfig, saveAppConfig, bumpRecent, getRecents } from '@main/storage';
- *   import { loadLayout, saveLayout } from '@main/storage';
+ *   import { loadLayout, saveLayout, loadLayoutByHash, saveLayoutByHash } from '@main/storage';
  */
 
 export {
@@ -35,7 +35,8 @@ export {
   saveAppConfig,
   bumpRecent,
   getRecents,
+  pruneRecent,
 } from './appConfig.js';
 
 export type { LayoutFileV1, NodePosition, Viewport } from './layout.js';
-export { loadLayout, saveLayout, layoutPathFor } from './layout.js';
+export { loadLayout, saveLayout, layoutPathFor, loadLayoutByHash, saveLayoutByHash } from './layout.js';

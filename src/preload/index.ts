@@ -16,7 +16,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC } from '@shared/ipc';
 import type { AtriumAPI } from '@preload/api';
-import type { ProjectState, TerminalId } from '@shared/index';
+import type { ProjectState, TerminalId, LayoutFileV1 } from '@shared/index';
+import type { SkillSpawnRequest } from '@shared/skill/spawn';
 
 // ---------------------------------------------------------------------------
 // Helper — build an ipcRenderer listener that wraps a user callback.
@@ -138,6 +139,30 @@ const api: AtriumAPI = {
   health: {
     checkClaude() {
       return ipcRenderer.invoke(IPC.health.checkClaude);
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // layout
+  // -------------------------------------------------------------------------
+  layout: {
+    load(projectHash: string) {
+      return ipcRenderer.invoke(IPC.layout.load, projectHash);
+    },
+    save(projectHash: string, data: LayoutFileV1) {
+      return ipcRenderer.invoke(IPC.layout.save, projectHash, data);
+    },
+    saveSnapshot(projectHash: string, data: LayoutFileV1) {
+      ipcRenderer.send(IPC.layout.saveSnapshot, projectHash, data);
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // skill
+  // -------------------------------------------------------------------------
+  skill: {
+    spawn(req: SkillSpawnRequest) {
+      return ipcRenderer.invoke(IPC.skill.spawn, req);
     },
   },
 };

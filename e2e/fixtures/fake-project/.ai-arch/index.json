@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "title": "E2E Test Project",
+  "nodes": [
+    {
+      "id": "test-node-1",
+      "file": "ideas/test-node-1.md",
+      "label": "Test Node 1",
+      "maturity": "raw",
+      "relationships": []
+    }
+  ]
+}

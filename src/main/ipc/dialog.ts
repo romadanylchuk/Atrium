@@ -9,10 +9,12 @@
  */
 
 import type { BrowserWindow } from 'electron';
+import { app } from 'electron';
 import { IPC } from '@shared/ipc';
 import { showOpenFolder } from '@main/project';
 import { safeHandle, type IpcMainLike } from './safeHandle';
 import { ipcMain as defaultIpcMain } from './ipcModule';
+import { ok } from '@shared/result';
 
 export function registerDialogHandlers(
   getWindow: () => BrowserWindow | null,
@@ -22,6 +24,10 @@ export function registerDialogHandlers(
   safeHandle(
     IPC.dialog.openFolder,
     async () => {
+      // E2E stub: bypass native dialog when the override env var is set.
+      if (process.env['ATRIUM_E2E_FOLDER'] && process.env['NODE_ENV'] !== 'production' && !app.isPackaged) {
+        return ok(process.env['ATRIUM_E2E_FOLDER']);
+      }
       return showOpenFolder(getWindow());
     },
     ipcMainLike,

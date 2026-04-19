@@ -16,7 +16,9 @@ import { ProjectErrorCode } from '@shared/errors';
 import type { ProjectState } from '@shared/domain';
 import { parseIndex } from '@main/parser';
 import { assembleProjectState } from '@main/parser';
-import { bumpRecent } from '@main/storage';
+import { bumpRecent, pruneRecent } from '@main/storage';
+import { hashKeyOnly } from '@main/storage/projectHash.js';
+import { isRecentsPoisoningError } from './recentsPruning.js';
 
 // ---------------------------------------------------------------------------
 // Warn prefix
@@ -33,12 +35,6 @@ function warn(msg: string): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Open an Atrium project at the given absolute path.
- *
- * Returns a `Result.ok(ProjectState)` on success, or a typed `Result.err`
- * with a `ProjectErrorCode` on failure. Never throws.
- */
-/**
  * Read and assemble a ProjectState from an absolute project path.
  *
  * Steps 1–7 of the pipeline — no side effects (no bumpRecent).
@@ -50,8 +46,12 @@ export async function readAndAssembleProject(absPath: string): Promise<Result<Pr
     await fs.stat(absPath);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return err(ProjectErrorCode.PATH_NOT_FOUND, `Path not found: "${absPath}" — ${msg}`);
+    const code = (e as NodeJS.ErrnoException).code;
+    const prefix = typeof code === 'string' ? `${code}: ` : '';
+    return err(ProjectErrorCode.PATH_NOT_FOUND, `${prefix}Path not found: "${absPath}" — ${msg}`);
   }
+
+  const projectHash = hashKeyOnly(absPath);
 
   // Step 2 — verify .ai-arch/index.json exists
   const archDir = nodePath.join(absPath, '.ai-arch');
@@ -104,7 +104,7 @@ export async function readAndAssembleProject(absPath: string): Promise<Result<Pr
   }
 
   // Step 7 — assemble ProjectState
-  return ok(assembleProjectState({ rootPath: absPath, index, ideaFiles, contextMD }));
+  return ok(assembleProjectState({ rootPath: absPath, projectHash, index, ideaFiles, contextMD }));
 }
 
 /**
@@ -113,13 +113,26 @@ export async function readAndAssembleProject(absPath: string): Promise<Result<Pr
  * Returns a `Result.ok(ProjectState)` on success, or a typed `Result.err`
  * with a `ProjectErrorCode` on failure. Never throws.
  */
-export async function openProject(absPath: string): Promise<Result<ProjectState, ProjectErrorCode>> {
+export async function openProject(
+  absPath: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<Result<ProjectState, ProjectErrorCode>> {
   const r = await readAndAssembleProject(absPath);
   if (r.ok) {
     bumpRecent(absPath, r.data.projectName).catch((e: unknown) => {
       const msg = e instanceof Error ? e.message : String(e);
       warn(`bumpRecent failed (non-fatal): ${msg}`);
     });
+  } else {
+    // Synthesise an errno-carrying object from the encoded message so the
+    // classifier can extract the code (message is "CODE: …" by convention).
+    const syntheticErr = { message: r.error.message };
+    if (isRecentsPoisoningError(syntheticErr, platform)) {
+      pruneRecent(absPath).catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        warn(`pruneRecent failed (non-fatal): ${msg}`);
+      });
+    }
   }
   return r;
 }

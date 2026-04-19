@@ -35,4 +35,12 @@ export const IPC = {
   health: {
     checkClaude: 'health:checkClaude',
   },
+  layout: {
+    load: 'layout:load',
+    save: 'layout:save',
+    saveSnapshot: 'layout:saveSnapshot',
+  },
+  skill: {
+    spawn: 'skill:spawn',
+  },
 } as const;
