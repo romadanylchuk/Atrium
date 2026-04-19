@@ -31,7 +31,13 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc -b",
     "test:e2e": "node scripts/test-e2e.mjs",
-    "icons": "node scripts/gen-icons.mjs"
+    "icons": "node scripts/gen-icons.mjs",
+    "build:pack": "electron-vite build && electron-builder --dir",
+    "build:win": "electron-vite build && electron-builder --win --publish never",
+    "build:mac": "electron-vite build && electron-builder --mac --universal --publish never",
+    "build:linux": "electron-vite build && electron-builder --linux --publish never",
+    "build:all": "electron-vite build && electron-builder --win --mac --linux --publish never",
+    "release": "electron-vite build && electron-builder --publish always"
   },
   "dependencies": {
     "@parcel/watcher": "2.5.6",
@@ -61,6 +67,7 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^4.0.0",
     "electron": "41.2.1",
+    "electron-builder": "26.0.12",
     "electron-vite": "^3.0.0",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.0.0",

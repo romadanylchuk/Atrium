@@ -1,0 +1,56 @@
+appId: io.github.rdanylchuk.terminus
+productName: Terminus
+copyright: Copyright © 2026 Roma Danylchuk
+
+directories:
+  buildResources: build
+  output: dist-electron
+
+files:
+  - out/**/*
+  - package.json
+  - "!**/*.{md,map,ts,tsx}"
+
+asar: true
+asarUnpack:
+  - "**/node-pty/**"
+  - "**/@parcel/watcher*/**"
+  - "**/*.node"
+
+extraResources:
+  - from: .claude/skills
+    to: skills
+
+win:
+  target: nsis
+  artifactName: Terminus-${version}-win-${arch}.${ext}
+  icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+
+mac:
+  # Set CSC_IDENTITY_AUTO_DISCOVERY=false in env to skip keychain lookup for unsigned v1 builds.
+  target:
+    - target: dmg
+      arch: universal
+  artifactName: Terminus-${version}-mac-universal.${ext}
+  icon: build/icon.icns
+  category: public.app-category.developer-tools
+  hardenedRuntime: false
+
+linux:
+  target:
+    - AppImage
+    - deb
+  artifactName: Terminus-${version}-linux-${arch}.${ext}
+  icon: build/icon.png
+  category: Development
+  maintainer: "Roma Danylchuk <roma@danylchuk.dev>"
+
+publish:
+  provider: github
+  releaseType: draft
+  vPrefixedTagName: true
