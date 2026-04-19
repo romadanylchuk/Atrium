@@ -1,4 +1,4 @@
-appId: io.github.rdanylchuk.terminus
+appId: io.github.romadanylchuk.terminus
 productName: Terminus
 copyright: Copyright © 2026 Roma Danylchuk
 
@@ -57,5 +57,7 @@ linux:
 
 publish:
   provider: github
+  owner: romadanylchuk
+  repo: Atrium
   releaseType: draft
   vPrefixedTagName: true

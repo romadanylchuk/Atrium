@@ -4,10 +4,10 @@
   "private": true,
   "description": "Multi-session terminal manager for Claude Code",
   "author": "Roma Danylchuk <roma@danylchuk.dev>",
-  "homepage": "https://github.com/rdanylchuk/atrium",
+  "homepage": "https://github.com/romadanylchuk/Atrium",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rdanylchuk/atrium.git"
+    "url": "https://github.com/romadanylchuk/Atrium.git"
   },
   "license": "UNLICENSED",
   "type": "module",
