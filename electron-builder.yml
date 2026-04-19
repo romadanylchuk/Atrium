@@ -1,5 +1,5 @@
-appId: io.github.romadanylchuk.terminus
-productName: Terminus
+appId: io.github.romadanylchuk.atrium
+productName: Atrium
 copyright: Copyright © 2026 Roma Danylchuk
 
 directories:
@@ -26,7 +26,7 @@ extraResources:
 
 win:
   target: nsis
-  artifactName: Terminus-${version}-win-${arch}.${ext}
+  artifactName: Atrium-${version}-win-${arch}.${ext}
   icon: build/icon.ico
   # Skip signing for local --dir smoke builds (no cert available in v1)
   signAndEditExecutable: false
@@ -41,7 +41,7 @@ mac:
   target:
     - target: dmg
       arch: universal
-  artifactName: Terminus-${version}-mac-universal.${ext}
+  artifactName: Atrium-${version}-mac-universal.${ext}
   icon: build/icon.icns
   category: public.app-category.developer-tools
   hardenedRuntime: false
@@ -50,7 +50,7 @@ linux:
   target:
     - AppImage
     - deb
-  artifactName: Terminus-${version}-linux-${arch}.${ext}
+  artifactName: Atrium-${version}-linux-${arch}.${ext}
   icon: build/icon.png
   category: Development
   maintainer: "Roma Danylchuk <roma@danylchuk.dev>"
