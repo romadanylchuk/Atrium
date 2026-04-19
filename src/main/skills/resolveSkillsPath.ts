@@ -7,6 +7,6 @@ export function resolveSkillsPath(): string {
   if (cached !== null) return cached;
   cached = app.isPackaged
     ? path.join(process.resourcesPath, 'skills')
-    : path.join(app.getAppPath(), 'skills');
+    : path.join(app.getAppPath(), '.claude/skills');
   return cached;
 }
