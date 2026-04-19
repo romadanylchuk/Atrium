@@ -20,10 +20,6 @@ asarUnpack:
 # Both node-pty and @parcel/watcher ship NAPI-stable prebuilts; no source rebuild needed.
 npmRebuild: false
 
-extraResources:
-  - from: .claude/skills
-    to: skills
-
 win:
   target: nsis
   artifactName: Atrium-${version}-win-${arch}.${ext}

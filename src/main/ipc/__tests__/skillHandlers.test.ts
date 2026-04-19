@@ -1,11 +1,3 @@
-/**
- * Tests for src/main/ipc/skill.ts — registerSkillHandlers
- *
- * Strategy: inject a fake ipcMainLike and a stub TerminalManager.
- * The handler is extracted by capturing the function passed to handle().
- * skillsPathFactory is injected to avoid electron.app dependency.
- */
-
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { IpcMainInvokeEvent } from 'electron';
 import { registerSkillHandlers } from '../skill';
@@ -41,8 +33,6 @@ const fakeTerminalManager = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const FAKE_SKILLS_DIR = '/fake/skills';
-const fakeSkillsFactory = () => FAKE_SKILLS_DIR;
 const fakeEvent = {} as IpcMainInvokeEvent;
 
 function getSkillSpawnHandler(): InvokeHandler {
@@ -62,7 +52,7 @@ function invoke(req: SkillSpawnRequest) {
 beforeEach(() => {
   handleMap.clear();
   fakeTerminalManager.spawn.mockReset();
-  registerSkillHandlers(fakeTerminalManager as never, fakeSkillsFactory, fakeIpcMain);
+  registerSkillHandlers(fakeTerminalManager as never, fakeIpcMain);
 });
 
 // ---------------------------------------------------------------------------
@@ -70,7 +60,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('registerSkillHandlers — happy path', () => {
-  it('explore: composeCommand receives skillsDir, terminalManager.spawn receives composed args + cwd', async () => {
+  it('explore: spawns with correct 2-element args and cwd', async () => {
     const terminalId = 't_abc123' as TerminalId;
     fakeTerminalManager.spawn.mockReturnValue({ ok: true, data: terminalId });
 
@@ -81,19 +71,12 @@ describe('registerSkillHandlers — happy path', () => {
     const [calledArgs, calledCwd] = fakeTerminalManager.spawn.mock.calls[0] as [string[], string];
 
     expect(calledCwd).toBe('/p');
-    // composeCommand for explore produces: ['claude', '/architector:explore canvas-ui', '--append-system-prompt-file', '<dir>/explore.md']
-    expect(calledArgs[0]).toBe('claude');
-    expect(calledArgs[1]).toContain('explore');
-    expect(calledArgs[1]).toContain('canvas-ui');
-    expect(calledArgs).toContain('--append-system-prompt-file');
-    expect(calledArgs[calledArgs.length - 1]).toContain('explore.md');
-    expect(calledArgs[calledArgs.length - 1]).toContain(FAKE_SKILLS_DIR);
-
+    expect(calledArgs).toEqual(['claude', '/architector:explore canvas-ui']);
     expect(result.ok).toBe(true);
     expect(result.data).toBe(terminalId);
   });
 
-  it('init without prompt: args end with init.md, no prompt in command', async () => {
+  it('init without prompt: 2-element args with no prompt in command', async () => {
     const terminalId = 't_init1' as TerminalId;
     fakeTerminalManager.spawn.mockReturnValue({ ok: true, data: terminalId });
 
@@ -101,8 +84,7 @@ describe('registerSkillHandlers — happy path', () => {
     await invoke(req);
 
     const [calledArgs] = fakeTerminalManager.spawn.mock.calls[0] as [string[], string];
-    expect(calledArgs[1]).toBe('/architector:init');
-    expect(calledArgs[calledArgs.length - 1]).toContain('init.md');
+    expect(calledArgs).toEqual(['claude', '/architector:init']);
   });
 
   it('init with prompt: prompt is embedded in the slash command', async () => {
@@ -113,8 +95,23 @@ describe('registerSkillHandlers — happy path', () => {
     await invoke(req);
 
     const [calledArgs] = fakeTerminalManager.spawn.mock.calls[0] as [string[], string];
-    expect(calledArgs[1]).toBe('/architector:init my cool project');
+    expect(calledArgs).toEqual(['claude', '/architector:init my cool project']);
   });
+});
+
+describe('registerSkillHandlers — no --append-system-prompt-file for any skill', () => {
+  it.each(['init', 'explore', 'decide', 'map', 'finalize'] as const)(
+    '%s: spawn args must not contain --append-system-prompt-file',
+    async (skill) => {
+      fakeTerminalManager.spawn.mockReturnValue({ ok: true, data: 't1' as TerminalId });
+
+      const req: SkillSpawnRequest = { skill, nodes: ['some-node'], prompt: 'p', cwd: '/p' };
+      await invoke(req);
+
+      const [calledArgs] = fakeTerminalManager.spawn.mock.calls[0] as [string[], string];
+      expect(calledArgs).not.toContain('--append-system-prompt-file');
+    },
+  );
 });
 
 describe('registerSkillHandlers — error paths', () => {
