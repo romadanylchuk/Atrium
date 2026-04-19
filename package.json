@@ -19,7 +19,6 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron .",
-    "postinstall": "electron-rebuild -f -w node-pty,@parcel/watcher",
     "rebuild:native": "electron-rebuild -f -w node-pty,@parcel/watcher",
     "test": "vitest run",
     "test:watch": "vitest",
