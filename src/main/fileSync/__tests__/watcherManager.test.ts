@@ -191,6 +191,40 @@ describe('WatcherManager — atomic swap', () => {
   });
 });
 
+describe('WatcherManager — zombie prevention', () => {
+  let tmpDirA: string;
+  let tmpDirB: string;
+  let manager: WatcherManager;
+
+  beforeEach(async () => {
+    tmpDirA = await fs.mkdtemp(path.join(os.tmpdir(), 'atrium-test-zombie-a-'));
+    tmpDirB = await fs.mkdtemp(path.join(os.tmpdir(), 'atrium-test-zombie-b-'));
+  });
+
+  afterEach(async () => {
+    await manager.stop();
+    await fs.rm(tmpDirA, { recursive: true, force: true });
+    await fs.rm(tmpDirB, { recursive: true, force: true });
+  });
+
+  it('A→B transition: edits to A do not fire events after switch to B', async () => {
+    const onReparse = vi.fn().mockResolvedValue(null);
+    manager = new WatcherManager({ onReparse });
+
+    await manager.start(tmpDirA);
+    // Switch to B without explicit stop — relies on start()'s internal stop
+    await manager.start(tmpDirB);
+
+    // Write to the OLD dir (A)
+    await writeFile(tmpDirA, 'in-a-after-switch.txt');
+    await wait(WAIT_MS);
+
+    // A's events must NOT have fired — no stale subscription
+    const calls = onReparse.mock.calls as [string][];
+    expect(calls.every((c) => c[0] === tmpDirB)).toBe(true);
+  });
+});
+
 describe('WatcherManager — non-existent dir', () => {
   it('start on non-existent path returns Result.err with NOT_FOUND', async () => {
     const onReparse = vi.fn();

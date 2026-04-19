@@ -10,16 +10,21 @@
  */
 
 import type { IpcMainInvokeEvent } from 'electron';
+import nodePath from 'node:path';
 import type { Result } from '@shared/result';
 import { ok, err } from '@shared/result';
 import { IPC } from '@shared/ipc';
 import { ProjectErrorCode } from '@shared/errors';
 import { openProject } from '@main/project';
 import { getRecents } from '@main/storage';
+import { WatcherManager } from '@main/fileSync';
 import { safeHandle, type IpcMainLike } from './safeHandle';
 import { ipcMain as defaultIpcMain } from './ipcModule';
 
-export function registerProjectHandlers(ipcMainLike: IpcMainLike = defaultIpcMain): void {
+export function registerProjectHandlers(
+  watcherManager: WatcherManager,
+  ipcMainLike: IpcMainLike = defaultIpcMain,
+): void {
   // project:open — open an Atrium project at the given absolute path
   safeHandle(
     IPC.project.open,
@@ -27,20 +32,37 @@ export function registerProjectHandlers(ipcMainLike: IpcMainLike = defaultIpcMai
       if (typeof path !== 'string') {
         return err(ProjectErrorCode.PATH_NOT_FOUND, 'path must be a string');
       }
-      return openProject(path);
+      const result = await openProject(path);
+      if (result.ok) {
+        await watcherManager.stop();
+        const archDir = nodePath.join(path, '.ai-arch');
+        const startResult = await watcherManager.start(archDir);
+        if (!startResult.ok) {
+          console.warn('[atrium:project] watcher start failed:', startResult.error.message);
+        }
+      }
+      return result;
     },
     ipcMainLike,
   );
 
-  // project:switch — for Stage 02 behaves identically to project:open.
-  // Stage 03 will add watcher teardown + re-setup before calling openProject.
+  // project:switch — stop prior subscription, start new one on success path.
   safeHandle(
     IPC.project.switch,
     async (_event: IpcMainInvokeEvent, path: unknown) => {
       if (typeof path !== 'string') {
         return err(ProjectErrorCode.PATH_NOT_FOUND, 'path must be a string');
       }
-      return openProject(path);
+      const result = await openProject(path);
+      if (result.ok) {
+        await watcherManager.stop();
+        const archDir = nodePath.join(path, '.ai-arch');
+        const startResult = await watcherManager.start(archDir);
+        if (!startResult.ok) {
+          console.warn('[atrium:project] watcher start failed:', startResult.error.message);
+        }
+      }
+      return result;
     },
     ipcMainLike,
   );

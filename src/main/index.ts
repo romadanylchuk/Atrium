@@ -65,6 +65,7 @@ function createMainWindow(): BrowserWindow {
   win.on('closed', () => {
     terminalManager.setWindow(null);
     watcherManager.setWindow(null);
+    void watcherManager.stop(); // fire-and-forget — unsubscribe at quit, no need to await
     mainWindow = null;
   });
 

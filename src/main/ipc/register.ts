@@ -43,7 +43,7 @@ export function registerIpc(
 
   const { terminalManager, watcherManager } = managers;
 
-  registerProjectHandlers();
+  registerProjectHandlers(watcherManager);
   registerDialogHandlers(getWindow);
   registerFileSyncHandlers(watcherManager);
   registerTerminalHandlers(terminalManager);
