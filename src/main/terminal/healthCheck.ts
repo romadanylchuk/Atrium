@@ -5,47 +5,15 @@
  * TerminalState.  The probe pty is fully independent and is killed before the
  * function returns.  See "singleton-slot invariant" in the feature plan Phase 6.
  */
-import { execFile } from 'node:child_process';
 import { spawn as ptySpawn } from 'node-pty';
 import { app } from 'electron';
 import { ok, err } from '@shared/result.js';
 import { HealthErrorCode } from '@shared/errors.js';
 import type { Result } from '@shared/result.js';
 import type { HealthInfo } from '@shared/domain.js';
+import { resolveClaudeBin } from './resolveClaudeBin.js';
 
 export const HEALTH_TIMEOUT_MS = 5000;
-
-const WHICH_TIMEOUT_MS = 3000;
-
-function resolveBinaryPath(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const cmd = process.platform === 'win32' ? 'where' : 'which';
-    let done = false;
-
-    const timer = setTimeout(() => {
-      if (done) return;
-      done = true;
-      try { cp.kill(); } catch { /* ignore */ }
-      reject(new Error('timeout resolving claude binary path'));
-    }, WHICH_TIMEOUT_MS);
-
-    const cp = execFile(cmd, ['claude'], (error, stdout) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      if (error) {
-        reject(error instanceof Error ? error : new Error(error?.message ?? 'execFile failed'));
-        return;
-      }
-      const firstLine = (stdout as unknown as string).trim().split(/\r?\n/)[0]?.trim() ?? '';
-      if (!firstLine) {
-        reject(new Error('empty output from which/where'));
-        return;
-      }
-      resolve(firstLine);
-    });
-  });
-}
 
 export async function checkClaude(): Promise<Result<HealthInfo, typeof HealthErrorCode[keyof typeof HealthErrorCode]>> {
   let claudePath: string;
@@ -56,7 +24,7 @@ export async function checkClaude(): Promise<Result<HealthInfo, typeof HealthErr
     claudePath = e2eBin;
   } else {
     try {
-      claudePath = await resolveBinaryPath();
+      claudePath = await resolveClaudeBin();
     } catch {
       return err(HealthErrorCode.CLAUDE_NOT_FOUND, "'claude' not on PATH — check your installation");
     }

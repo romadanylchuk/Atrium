@@ -143,7 +143,7 @@ describe('Tooltip', () => {
     await act(async () => {});
 
     expect(useAtriumStore.getState().tooltipTarget).toBe('canvas-ui');
-    expect(screen.getByTestId('spawn-error').textContent).toBe('Skill failed: SPAWN_FAILED');
+    expect(screen.getByTestId('spawn-error').textContent).toBe('Skill failed: pty died');
     document.body.removeChild(fakeNode);
   });
 

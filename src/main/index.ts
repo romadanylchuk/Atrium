@@ -5,11 +5,13 @@ import { applyFixPath } from '@main/boot';
 import { registerIpc } from '@main/ipc';
 import { getProjectsDir } from '@main/storage';
 import { TerminalManager } from '@main/terminal';
+import { resolveClaudeBin } from '@main/terminal/resolveClaudeBin';
 import { WatcherManager } from '@main/fileSync';
 import { readAndAssembleProject } from '@main/project';
 import { flushLayoutBuffer } from '@main/ipc/flushLayoutBuffer';
 
 applyFixPath();
+void resolveClaudeBin().catch(() => { /* health check will surface a proper error */ });
 
 export { flushLayoutBuffer };
 

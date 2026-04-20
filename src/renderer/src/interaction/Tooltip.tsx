@@ -57,8 +57,8 @@ function TooltipInner({ nodeScreenX, nodeScreenY }: Props): JSX.Element | null {
     setTooltipTarget(null);
   }
 
-  function handleError(code: string) {
-    const msg = `Skill failed: ${code}`;
+  function handleError(error: { code: string; message: string }) {
+    const msg = `Skill failed: ${error.message}`;
     setSpawnError(msg);
     pushToast(msg, 'error');
   }

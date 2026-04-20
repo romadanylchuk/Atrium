@@ -9,6 +9,7 @@ import { IPC } from '@shared/ipc';
 import { type TerminalState, canTransition } from './state';
 import { KILL_FALLBACK_MS, MAX_WRITE_BYTES } from './constants';
 import { toArrayBuffer } from './toArrayBuffer';
+import { getCachedClaudeBin } from './resolveClaudeBin';
 
 export class TerminalManager {
   #state: TerminalState = 'idle';
@@ -43,10 +44,17 @@ export class TerminalManager {
 
     // E2E override: replace the first arg (the claude binary) with the fixture.
     const e2eBin = process.env['ATRIUM_E2E_CLAUDE_BIN'];
-    const spawnArgs =
-      e2eBin && process.env['NODE_ENV'] !== 'production' && !app.isPackaged
-        ? [e2eBin, ...args.slice(1)]
-        : args;
+    let spawnArgs: string[];
+    if (e2eBin && process.env['NODE_ENV'] !== 'production' && !app.isPackaged) {
+      spawnArgs = [e2eBin, ...args.slice(1)];
+    } else if (args[0] === 'claude') {
+      // node-pty cannot resolve bare CLI shims (`.cmd` on Windows, etc) via PATH.
+      // Swap in the absolute path eagerly resolved at main boot when available.
+      const resolved = getCachedClaudeBin();
+      spawnArgs = resolved !== null ? [resolved, ...args.slice(1)] : args;
+    } else {
+      spawnArgs = args;
+    }
 
     let pty: IPty;
     try {

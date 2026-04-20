@@ -9,7 +9,7 @@ type Props = {
   cwd: string;
   disabled?: boolean;
   onSuccess: () => void;
-  onError: (code: string) => void;
+  onError: (error: { code: string; message: string }) => void;
 };
 
 export function SkillButton({ skill, label, nodes, cwd, disabled, onSuccess, onError }: Props): JSX.Element {
@@ -18,7 +18,7 @@ export function SkillButton({ skill, label, nodes, cwd, disabled, onSuccess, onE
     if (result.ok) {
       onSuccess();
     } else {
-      onError(result.error.code);
+      onError(result.error);
     }
   }
 
