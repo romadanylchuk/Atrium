@@ -12,6 +12,12 @@ const xtermOnDataMock = vi.fn().mockReturnValue({ dispose: vi.fn() });
 const xtermOpenMock = vi.fn();
 const xtermDisposeMock = vi.fn();
 const fitMock = vi.fn();
+const attachCustomKeyEventHandlerMock = vi.fn();
+const hasSelectionMock = vi.fn();
+const getSelectionMock = vi.fn();
+const clearSelectionMock = vi.fn();
+const readTextMock = vi.fn().mockResolvedValue('');
+const writeTextMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('xterm', () => {
   class Terminal {
@@ -22,6 +28,10 @@ vi.mock('xterm', () => {
     open = xtermOpenMock;
     dispose = xtermDisposeMock;
     loadAddon = vi.fn();
+    attachCustomKeyEventHandler = attachCustomKeyEventHandlerMock;
+    hasSelection = hasSelectionMock;
+    getSelection = getSelectionMock;
+    clearSelection = clearSelectionMock;
   }
   return { Terminal };
 });
@@ -44,6 +54,7 @@ const onExitCbs: Map<TerminalId, (code: number | null) => void> = new Map();
 const onErrorCbs: Map<TerminalId, (err: { code: string; message: string }) => void> = new Map();
 
 const killMock = vi.fn().mockResolvedValue({ ok: true, data: undefined });
+const closeMock = vi.fn().mockResolvedValue({ ok: true, data: undefined });
 const writeMock = vi.fn();
 const resizeMock = vi.fn();
 const projectOpenMock = vi.fn();
@@ -63,6 +74,7 @@ const makeAtrium = () => ({
       return () => onErrorCbs.delete(id);
     }),
     kill: killMock,
+    close: closeMock,
     write: writeMock,
     resize: resizeMock,
   },
@@ -93,14 +105,42 @@ function resetStore() {
   xtermDisposeMock.mockClear();
   fitMock.mockClear();
   killMock.mockClear();
+  closeMock.mockClear();
   writeMock.mockClear();
   resizeMock.mockClear();
   projectOpenMock.mockClear();
+  attachCustomKeyEventHandlerMock.mockReset();
+  hasSelectionMock.mockReset();
+  getSelectionMock.mockReset();
+  clearSelectionMock.mockReset();
+  readTextMock.mockReset().mockResolvedValue('');
+  writeTextMock.mockReset().mockResolvedValue(undefined);
+}
+
+type FireKeyInit = Partial<Pick<KeyboardEvent, 'type' | 'ctrlKey' | 'shiftKey' | 'altKey' | 'metaKey' | 'code' | 'key'>> & { preventDefault?: ReturnType<typeof vi.fn> };
+
+function fireKey(keyInit?: FireKeyInit): boolean {
+  const handler = attachCustomKeyEventHandlerMock.mock.calls[0]?.[0] as
+    | ((e: Record<string, unknown>) => boolean)
+    | undefined;
+  if (!handler) throw new Error('attachCustomKeyEventHandler not called — did you render <TerminalModal />?');
+  return handler({
+    type: 'keydown',
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    code: '',
+    key: '',
+    preventDefault: vi.fn(),
+    ...keyInit,
+  });
 }
 
 describe('TerminalModal', () => {
   beforeEach(() => {
     vi.stubGlobal('atrium', makeAtrium());
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { readText: readTextMock, writeText: writeTextMock } });
     resetStore();
   });
 
@@ -252,6 +292,30 @@ describe('TerminalModal', () => {
     expect(useAtriumStore.getState().terminal.status).toBe('idle');
   });
 
+  it('Close button triggers window.atrium.terminal.close(id)', () => {
+    act(() => {
+      useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'exited', fullscreen: false } });
+    });
+    render(<TerminalModal />);
+    act(() => {
+      screen.getByLabelText('Close terminal').click();
+    });
+    expect(closeMock).toHaveBeenCalledTimes(1);
+    expect(closeMock).toHaveBeenCalledWith(TERM_ID);
+  });
+
+  it('Escape key triggers window.atrium.terminal.close(id)', () => {
+    act(() => {
+      useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'exited', fullscreen: false } });
+    });
+    render(<TerminalModal />);
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(closeMock).toHaveBeenCalledTimes(1);
+    expect(closeMock).toHaveBeenCalledWith(TERM_ID);
+  });
+
   // -------------------------------------------------------------------------
   // Init-flow: success path
   // -------------------------------------------------------------------------
@@ -317,6 +381,16 @@ describe('TerminalModal', () => {
   // Fullscreen toggle works while active (previously a silent no-op via setTerminal)
   // -------------------------------------------------------------------------
 
+  it('overlay element has position absolute (canvas-bounded)', () => {
+    act(() => {
+      useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'spawning', fullscreen: false } });
+    });
+    render(<TerminalModal />);
+    const overlay = screen.getByTestId('terminal-modal');
+    expect(overlay.style.position).toBe('absolute');
+    expect(overlay.style.position).not.toBe('fixed');
+  });
+
   it('fullscreen toggle works while status is active', () => {
     act(() => {
       useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'active', fullscreen: false } });
@@ -339,5 +413,211 @@ describe('TerminalModal', () => {
     });
     expect(useAtriumStore.getState().terminal.fullscreen).toBe(true);
     expect(useAtriumStore.getState().terminal.status).toBe('spawning');
+  });
+
+  // -------------------------------------------------------------------------
+  // Clipboard key handler integration
+  // -------------------------------------------------------------------------
+
+  describe('clipboard key handler', () => {
+    it('Ctrl+C with selection: copies text, clears selection, swallows key', () => {
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'active', fullscreen: false } });
+      });
+      render(<TerminalModal />);
+
+      hasSelectionMock.mockReturnValue(true);
+      getSelectionMock.mockReturnValue('hello');
+
+      const preventDefaultSpy = vi.fn();
+      const result = fireKey({ ctrlKey: true, code: 'KeyC', preventDefault: preventDefaultSpy });
+
+      expect(result).toBe(false);
+      expect(preventDefaultSpy).toHaveBeenCalled();
+      expect(writeTextMock).toHaveBeenCalledWith('hello');
+      expect(clearSelectionMock).toHaveBeenCalled();
+      expect(writeMock).not.toHaveBeenCalled();
+    });
+
+    it('Ctrl+C without selection: passes through (SIGINT preserved)', () => {
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'active', fullscreen: false } });
+      });
+      render(<TerminalModal />);
+
+      hasSelectionMock.mockReturnValue(false);
+
+      const preventDefaultSpy = vi.fn();
+      const result = fireKey({ ctrlKey: true, code: 'KeyC', preventDefault: preventDefaultSpy });
+
+      expect(result).toBe(true);
+      expect(preventDefaultSpy).not.toHaveBeenCalled();
+      expect(writeTextMock).not.toHaveBeenCalled();
+      expect(writeMock).not.toHaveBeenCalled();
+    });
+
+    it('Ctrl+V active with clipboard text: pastes to pty', async () => {
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'active', fullscreen: false } });
+      });
+      render(<TerminalModal />);
+
+      readTextMock.mockResolvedValue('abc');
+
+      const preventDefaultSpy = vi.fn();
+      const result = fireKey({ ctrlKey: true, code: 'KeyV', preventDefault: preventDefaultSpy });
+
+      expect(result).toBe(false);
+      expect(preventDefaultSpy).toHaveBeenCalled();
+
+      await waitFor(() => {
+        expect(writeMock).toHaveBeenCalledOnce();
+      });
+      const [calledId, calledBuf] = writeMock.mock.calls[0] as [TerminalId, ArrayBuffer];
+      expect(calledId).toBe(TERM_ID);
+      expect(new TextDecoder().decode(calledBuf)).toBe('\x1b[200~abc\x1b[201~');
+    });
+
+    it('Ctrl+V with empty clipboard: swallows key, no pty write', async () => {
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'active', fullscreen: false } });
+      });
+      render(<TerminalModal />);
+
+      readTextMock.mockResolvedValue('');
+
+      const result = fireKey({ ctrlKey: true, code: 'KeyV' });
+      expect(result).toBe(false);
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(writeMock).not.toHaveBeenCalled();
+    });
+
+    it('Ctrl+V during spawning: swallows key, no clipboard read, no pty write', () => {
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'spawning', fullscreen: false } });
+      });
+      render(<TerminalModal />);
+
+      const result = fireKey({ ctrlKey: true, code: 'KeyV' });
+
+      expect(result).toBe(false);
+      expect(readTextMock).not.toHaveBeenCalled();
+      expect(writeMock).not.toHaveBeenCalled();
+    });
+
+    it('Ctrl+V with rejected clipboard: swallows key, no pty write', async () => {
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'active', fullscreen: false } });
+      });
+      render(<TerminalModal />);
+
+      readTextMock.mockRejectedValue(new Error('denied'));
+
+      const result = fireKey({ ctrlKey: true, code: 'KeyV' });
+      expect(result).toBe(false);
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(writeMock).not.toHaveBeenCalled();
+    });
+
+    it('Ctrl+V: active→exited during clipboard read does not write to pty', async () => {
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'active', fullscreen: false } });
+      });
+      render(<TerminalModal />);
+
+      let resolveClipboard!: (text: string) => void;
+      readTextMock.mockReturnValue(
+        new Promise<string>((res) => {
+          resolveClipboard = res;
+        }),
+      );
+
+      fireKey({ ctrlKey: true, code: 'KeyV' });
+
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'exited', fullscreen: false } });
+      });
+
+      await act(async () => {
+        resolveClipboard('abc');
+        await Promise.resolve();
+      });
+
+      expect(writeMock).not.toHaveBeenCalled();
+    });
+
+    it('Ctrl+Shift+C without selection: swallows key, no clipboard write', () => {
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'active', fullscreen: false } });
+      });
+      render(<TerminalModal />);
+
+      hasSelectionMock.mockReturnValue(false);
+
+      const preventDefaultSpy = vi.fn();
+      const result = fireKey({ ctrlKey: true, shiftKey: true, code: 'KeyC', preventDefault: preventDefaultSpy });
+
+      expect(result).toBe(false);
+      expect(preventDefaultSpy).toHaveBeenCalled();
+      expect(writeTextMock).not.toHaveBeenCalled();
+      expect(clearSelectionMock).not.toHaveBeenCalled();
+    });
+
+    it('Ctrl+Shift+V active: pastes to pty', async () => {
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'active', fullscreen: false } });
+      });
+      render(<TerminalModal />);
+
+      readTextMock.mockResolvedValue('xyz');
+
+      const result = fireKey({ ctrlKey: true, shiftKey: true, code: 'KeyV' });
+      expect(result).toBe(false);
+
+      await waitFor(() => {
+        expect(writeMock).toHaveBeenCalledOnce();
+      });
+      const [, calledBuf] = writeMock.mock.calls[0] as [TerminalId, ArrayBuffer];
+      expect(new TextDecoder().decode(calledBuf)).toBe('\x1b[200~xyz\x1b[201~');
+    });
+
+    it('Ctrl+V with multi-line CRLF clipboard: writes bracketed-paste envelope with normalized LF', async () => {
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'active', fullscreen: false } });
+      });
+      render(<TerminalModal />);
+
+      readTextMock.mockResolvedValue('line1\r\nline2\r\nline3');
+
+      const result = fireKey({ ctrlKey: true, code: 'KeyV' });
+      expect(result).toBe(false);
+
+      await waitFor(() => {
+        expect(writeMock).toHaveBeenCalledOnce();
+      });
+      const [, calledBuf] = writeMock.mock.calls[0] as [TerminalId, ArrayBuffer];
+      expect(new TextDecoder().decode(calledBuf)).toBe('\x1b[200~line1\nline2\nline3\x1b[201~');
+    });
+
+    it('keyup Ctrl+V: passes through, no clipboard I/O', () => {
+      act(() => {
+        useAtriumStore.setState({ terminal: { id: TERM_ID, status: 'active', fullscreen: false } });
+      });
+      render(<TerminalModal />);
+
+      const result = fireKey({ type: 'keyup', ctrlKey: true, code: 'KeyV' });
+
+      expect(result).toBe(true);
+      expect(readTextMock).not.toHaveBeenCalled();
+      expect(writeMock).not.toHaveBeenCalled();
+    });
   });
 });

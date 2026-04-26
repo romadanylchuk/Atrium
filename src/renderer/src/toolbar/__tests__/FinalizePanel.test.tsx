@@ -59,4 +59,12 @@ describe('FinalizePanel', () => {
     render(<FinalizePanel project={fakeProject} canContinue onContinue={() => {}} onClose={() => {}} />);
     expect(screen.getByTestId('finalize-panel-continue').getAttribute('disabled')).toBeNull();
   });
+
+  it('overlay wrapper has position absolute and inset 0 (canvas-bounded)', () => {
+    render(<FinalizePanel project={fakeProject} canContinue onContinue={() => {}} onClose={() => {}} />);
+    const panel = screen.getByTestId('finalize-panel');
+    expect(panel.style.position).toBe('absolute');
+    expect(panel.style.position).not.toBe('fixed');
+    expect(panel.style.inset).toBe('0px');
+  });
 });

@@ -75,3 +75,11 @@ export function getLayoutPath(hash: string): string {
 export function getMetaPath(hash: string): string {
   return nodePath.join(getProjectDir(hash), 'meta.json');
 }
+
+/**
+ * Path to the consultation file for a project.
+ * @param hash — 8-char hex key from `hashKeyOnly`.
+ */
+export function getConsultationPath(hash: string): string {
+  return nodePath.join(getProjectDir(hash), 'consultation.json');
+}

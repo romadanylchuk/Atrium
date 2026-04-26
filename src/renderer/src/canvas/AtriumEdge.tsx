@@ -1,14 +1,9 @@
+import { useState } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from 'reactflow';
 import { resolveConnectionStyle } from './visualEncoding';
 
 export type AtriumEdgeData = {
   type: string;
-};
-
-const STROKE_DASH: Record<string, string> = {
-  solid: 'none',
-  dashed: '6,3',
-  dotted: '2,3',
 };
 
 export function AtriumEdge({
@@ -23,6 +18,7 @@ export function AtriumEdge({
 }: EdgeProps<AtriumEdgeData>) {
   const rawType = data?.type ?? '';
   const { known, style } = resolveConnectionStyle(rawType);
+  const [hovered, setHovered] = useState(false);
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -33,7 +29,7 @@ export function AtriumEdge({
     targetPosition,
   });
 
-  const strokeDasharray = STROKE_DASH[style.stroke] ?? 'none';
+  const strokeDasharray = style.strokeDasharray === 'none' ? undefined : style.strokeDasharray;
 
   return (
     <>
@@ -42,25 +38,39 @@ export function AtriumEdge({
         path={edgePath}
         style={{
           stroke: style.color,
-          strokeWidth: style.width ?? 2,
+          strokeWidth: style.width,
           strokeDasharray,
         }}
       />
-      {!known && (
-        <EdgeLabelRenderer>
-          <div
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+          }}
+          className="nodrag nopan"
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+        >
+          <span
+            {...(known ? { 'data-known-type': rawType } : { 'data-unknown-type': rawType })}
             style={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              display: hovered ? 'block' : 'none',
+              background: 'rgba(20,20,25,0.92)',
+              border: '0.5px solid #2a2a32',
+              borderRadius: '4px',
+              padding: '2px 6px',
               fontSize: '10px',
-              pointerEvents: 'all',
+              color: '#e6e6e6',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
             }}
-            className="nodrag nopan"
           >
-            <span data-unknown-type={rawType}>{rawType}</span>
-          </div>
-        </EdgeLabelRenderer>
-      )}
+            {known ? `type: ${rawType}` : `type: ${rawType} (unknown)`}
+          </span>
+        </div>
+      </EdgeLabelRenderer>
     </>
   );
 }

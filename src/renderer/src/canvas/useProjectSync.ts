@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { Node as RFNode, Edge as RFEdge } from 'reactflow';
+import { MarkerType, type Node as RFNode, type Edge as RFEdge } from 'reactflow';
 import type { NodePosition } from '@shared/layout';
 import type { ProjectState } from '@shared/domain';
 import { useAtriumStore } from '../store/atriumStore';
@@ -11,13 +11,16 @@ export interface UseProjectSyncParams {
   seedPositions?: Map<string, NodePosition>;
   setNodes: (nodes: RFNode[]) => void;
   setEdges: (edges: RFEdge[]) => void;
+  relayoutRequestId?: number;
 }
 
 export function useProjectSync(params: UseProjectSyncParams): void {
-  const { project, seedPositions, setNodes, setEdges } = params;
+  const { project, seedPositions, setNodes, setEdges, relayoutRequestId = 0 } = params;
 
   // Track previous RF node list to diff against
   const prevNodesRef = useRef<RFNode[]>([]);
+  // Track last seen relayoutRequestId to detect manual re-layout triggers
+  const prevRelayoutIdRef = useRef<number>(0);
   // Warning tracker: reset on projectHash change
   const warnTrackerRef = useRef<{
     hash: string;
@@ -55,7 +58,15 @@ export function useProjectSync(params: UseProjectSyncParams): void {
     const prevSlugs = new Set(prevNodes.map((n) => n.id));
     const nextSlugs = new Set(project.nodes.map((n) => n.slug));
 
-    const addedSlugs = new Set([...nextSlugs].filter((s) => !prevSlugs.has(s)));
+    // Manual re-layout: treat all nodes as new so dagre runs for everything
+    const isRelayoutTrigger = relayoutRequestId > prevRelayoutIdRef.current;
+    if (isRelayoutTrigger) {
+      prevRelayoutIdRef.current = relayoutRequestId;
+    }
+
+    const addedSlugs = isRelayoutTrigger
+      ? new Set(nextSlugs)
+      : new Set([...nextSlugs].filter((s) => !prevSlugs.has(s)));
     const removedSlugs = new Set([...prevSlugs].filter((s) => !nextSlugs.has(s)));
 
     // Handle removed nodes — strip from selection + tooltip
@@ -70,18 +81,27 @@ export function useProjectSync(params: UseProjectSyncParams): void {
       }
     }
 
-    // Build existing position map from current RF nodes
+    // Build existing position map from current RF nodes (cleared on manual relayout)
     const existingPositions = new Map<string, NodePosition>();
-    for (const rfNode of prevNodes) {
-      if (!removedSlugs.has(rfNode.id)) {
-        existingPositions.set(rfNode.id, { x: rfNode.position.x, y: rfNode.position.y });
+    if (!isRelayoutTrigger) {
+      for (const rfNode of prevNodes) {
+        if (!removedSlugs.has(rfNode.id)) {
+          existingPositions.set(rfNode.id, { x: rfNode.position.x, y: rfNode.position.y });
+        }
       }
     }
+
+    // All-identical-seed gate: if multiple seeds all share the same coordinate,
+    // treat as an auto-layout marker and skip seed application so dagre runs fresh.
+    const allIdenticalSeeds =
+      seedPositions &&
+      seedPositions.size > 1 &&
+      new Set(Array.from(seedPositions.values()).map((p) => `${p.x}_${p.y}`)).size === 1;
 
     // First pass for this projectHash: seeds overwrite existing (which may be dagre from an
     // empty-seed first render). Only flip seedApplied when seeds are non-empty so the two-render
     // flow (Canvas mounts sync, layout.load resolves async) still wins on the populated pass.
-    if (seedPositions && !tracker.seedApplied) {
+    if (seedPositions && !tracker.seedApplied && !allIdenticalSeeds) {
       for (const [slug, pos] of seedPositions) {
         if (!nextSlugs.has(slug)) {
           if (!tracker.staleLayoutSlugs.has(slug)) {
@@ -95,6 +115,9 @@ export function useProjectSync(params: UseProjectSyncParams): void {
       if (seedPositions.size > 0) {
         tracker.seedApplied = true;
       }
+    } else if (allIdenticalSeeds && !tracker.seedApplied) {
+      // Skip seed application but mark as applied so dagre runs via addedSlugs path
+      tracker.seedApplied = true;
     }
 
     // Compute dagre positions for new nodes
@@ -136,23 +159,29 @@ export function useProjectSync(params: UseProjectSyncParams): void {
 
     // Build new RF edges
     const nextRFEdges: RFEdge[] = project.connections.map((conn, idx) => {
-      const { known: connKnown } = resolveConnectionStyle(conn.type);
+      const edgeId = `${conn.from}-${conn.to}-${idx}`;
+      const { known: connKnown, style: connStyle } = resolveConnectionStyle(conn.type);
       if (!connKnown && !tracker.connType.has(conn.type)) {
         tracker.connType.add(conn.type);
-        console.warn(`[atrium] Unknown connection type: "${conn.type}"`);
+        if (import.meta.env.DEV) {
+          console.warn(
+            `[atrium] Unknown connection type: "${conn.type}" on edge ${edgeId}. Falling back to unknown style.`,
+          );
+        }
       }
 
       return {
-        id: `${conn.from}-${conn.to}-${idx}`,
+        id: edgeId,
         source: conn.from,
         target: conn.to,
         type: 'atriumEdge',
         data: { type: conn.type },
+        markerEnd: { type: MarkerType.ArrowClosed, color: connStyle.color },
       };
     });
 
     prevNodesRef.current = nextRFNodes;
     setNodes(nextRFNodes);
     setEdges(nextRFEdges);
-  }, [project, seedPositions, setNodes, setEdges]);
+  }, [project, seedPositions, setNodes, setEdges, relayoutRequestId]);
 }

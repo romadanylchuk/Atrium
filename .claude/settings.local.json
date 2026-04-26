@@ -26,7 +26,11 @@
       "mcp__plugin_serena_serena__replace_content",
       "Bash(npx tsc *)",
       "mcp__plugin_serena_serena__find_symbol",
-      "mcp__plugin_serena_serena__search_for_pattern"
+      "mcp__plugin_serena_serena__search_for_pattern",
+      "Bash(where uvx *)",
+      "Bash(where uv *)",
+      "Bash(where python *)",
+      "Bash(claude mcp *)"
     ]
   }
 }

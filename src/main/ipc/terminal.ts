@@ -4,6 +4,7 @@
  * Invoke channels (renderer → main, returns Result):
  *   terminal:spawn  → manager.spawn(args, cwd)
  *   terminal:kill   → manager.kill(id)
+ *   terminal:close  → manager.closeAfterExit(id) (errors swallowed, always returns ok)
  *
  * Fire-and-forget channels (renderer → main, no response):
  *   terminal:write  → manager.write(id, data)
@@ -15,6 +16,7 @@
  */
 
 import { IPC } from '@shared/ipc';
+import { ok } from '@shared/result';
 import { safeHandle, type IpcMainLike } from './safeHandle';
 import { ipcMain as defaultIpcMain } from './ipcModule';
 import { TerminalManager } from '@main/terminal';
@@ -38,6 +40,21 @@ export function registerTerminalHandlers(manager: TerminalManager, ipcMainLike: 
   safeHandle(
     IPC.terminal.kill,
     (_, id) => Promise.resolve(manager.kill(id as TerminalId)),
+    ipcMainLike,
+  );
+
+  safeHandle(
+    IPC.terminal.close,
+    (_, id) => {
+      const result = manager.closeAfterExit(id as TerminalId);
+      if (!result.ok) {
+        console.warn(
+          `[atrium:terminal] close ignored: code=${result.error.code} message=${result.error.message}`,
+        );
+        return Promise.resolve(ok(undefined));
+      }
+      return Promise.resolve(result);
+    },
     ipcMainLike,
   );
 

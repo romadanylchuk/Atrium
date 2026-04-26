@@ -19,12 +19,18 @@ import type {
   TerminalErrorCode,
   HealthInfo,
   HealthErrorCode,
+  PluginInfo,
+  InstallOutcome,
   RecentProject,
   LayoutFileV1,
   LayoutErrorCode,
   SkillErrorCode,
+  ConsultationFile,
+  ConsultationModel,
+  ConsultationErrorCode,
 } from '@shared/index';
 import type { SkillSpawnRequest } from '@shared/skill/spawn';
+import type { DetachedRunRequest, DetachedRunResult } from '@shared/skill/detached';
 
 export type AtriumAPI = {
   project: {
@@ -43,6 +49,7 @@ export type AtriumAPI = {
   terminal: {
     spawn(args: string[], cwd: string): Promise<Result<TerminalId, TerminalErrorCode>>;
     kill(id: TerminalId): Promise<Result<void, TerminalErrorCode>>;
+    close(id: TerminalId): Promise<Result<void, TerminalErrorCode>>;
     write(id: TerminalId, data: ArrayBuffer): void;
     resize(id: TerminalId, cols: number, rows: number): void;
     onData(id: TerminalId, cb: (data: ArrayBuffer) => void): () => void;
@@ -51,6 +58,9 @@ export type AtriumAPI = {
   };
   health: {
     checkClaude(): Promise<Result<HealthInfo, HealthErrorCode>>;
+    checkPlugin(): Promise<Result<PluginInfo, HealthErrorCode>>;
+    installPlugin(): Promise<Result<InstallOutcome, HealthErrorCode>>;
+    cancelInstall(): Promise<Result<void, HealthErrorCode>>;
   };
   layout: {
     load(projectHash: string): Promise<Result<LayoutFileV1 | null, LayoutErrorCode>>;
@@ -59,6 +69,24 @@ export type AtriumAPI = {
   };
   skill: {
     spawn(req: SkillSpawnRequest): Promise<Result<TerminalId, SkillErrorCode>>;
+    runDetached(req: DetachedRunRequest): Promise<Result<DetachedRunResult, SkillErrorCode>>;
+  };
+  consultation: {
+    loadThread(projectRoot: string):
+      Promise<Result<ConsultationFile | null, ConsultationErrorCode>>;
+    sendMessage(projectRoot: string, message: string):
+      Promise<Result<{ messageId: string }, ConsultationErrorCode>>;
+    newSession(projectRoot: string, model: ConsultationModel):
+      Promise<Result<{ sessionId: string; systemPromptVersion: number }, ConsultationErrorCode>>;
+    cancel(projectRoot: string, messageId: string):
+      Promise<Result<void, ConsultationErrorCode>>;
+    onStreamChunk(messageId: string, cb: (fullText: string) => void): () => void;
+    onStreamComplete(messageId: string, cb: (fullContent: string) => void): () => void;
+    onStreamError(messageId: string,
+      cb: (err: { code: ConsultationErrorCode; raw?: string }) => void): () => void;
+  };
+  shell: {
+    openExternal(url: string): Promise<void>;
   };
 };
 

@@ -23,7 +23,7 @@ function makeNode(slug: string, maturity = 'decided'): NodeData {
   };
 }
 
-function makeConnection(from: string, to: string, type = 'depends-on'): Connection {
+function makeConnection(from: string, to: string, type = 'dependency'): Connection {
   return { from, to, type };
 }
 
@@ -51,16 +51,17 @@ function makeProject(
 function renderSync(
   initialProject: ProjectState | null = null,
   initialSeedPositions?: Map<string, NodePosition>,
+  initialRelayoutId = 0,
 ) {
   const setNodes = vi.fn<(nodes: RFNode[]) => void>();
   const setEdges = vi.fn<(edges: RFEdge[]) => void>();
 
-  type Props = { project: ProjectState | null; seedPositions?: Map<string, NodePosition> };
+  type Props = { project: ProjectState | null; seedPositions?: Map<string, NodePosition>; relayoutRequestId?: number };
   const { rerender } = renderHook(
-    ({ project, seedPositions }: Props) => {
-      useProjectSync({ project, seedPositions, setNodes, setEdges });
+    ({ project, seedPositions, relayoutRequestId }: Props) => {
+      useProjectSync({ project, seedPositions, setNodes, setEdges, relayoutRequestId });
     },
-    { initialProps: { project: initialProject, seedPositions: initialSeedPositions } as Props },
+    { initialProps: { project: initialProject, seedPositions: initialSeedPositions, relayoutRequestId: initialRelayoutId } as Props },
   );
 
   return { setNodes, setEdges, rerender };
@@ -207,6 +208,40 @@ describe('useProjectSync diff cases', () => {
 });
 
 // ---------------------------------------------------------------------------
+// markerEnd per-edge colour
+// ---------------------------------------------------------------------------
+
+describe('markerEnd coloring', () => {
+  it('edges get markerEnd with resolved color matching the connection style', () => {
+    const proj = makeProject(
+      [makeNode('a'), makeNode('b')],
+      [makeConnection('a', 'b', 'dependency')],
+    );
+
+    const { setEdges } = renderSync(proj);
+
+    const edges = setEdges.mock.calls.at(-1)![0];
+    expect(edges).toHaveLength(1);
+    const edge = edges[0]!;
+    expect(edge.markerEnd).toBeDefined();
+    expect((edge.markerEnd as { color: string }).color).toBe('#5b8fd4');
+  });
+
+  it('unknown connection type gets unknown color for markerEnd', () => {
+    const proj = makeProject(
+      [makeNode('a'), makeNode('b')],
+      [makeConnection('a', 'b', 'unknown-type')],
+    );
+
+    const { setEdges } = renderSync(proj);
+
+    const edges = setEdges.mock.calls.at(-1)![0];
+    const edge = edges[0]!;
+    expect((edge.markerEnd as { color: string }).color).toBe('#6a6a72');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Warning tracker tests
 // ---------------------------------------------------------------------------
 
@@ -251,6 +286,22 @@ describe('warning tracker', () => {
     ).length;
 
     expect(countAfterSecond).toBe(countAfterFirst);
+  });
+
+  it('unknown connection warning format includes edge-id and is dev-gated', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // DEV is true in Vitest by default
+    const proj = makeProject(
+      [makeNode('a'), makeNode('b')],
+      [makeConnection('a', 'b', 'weird-rel')],
+    );
+    renderSync(proj);
+    const msg = String(
+      warnSpy.mock.calls.find((c) => String(c[0]).includes('Unknown connection type'))?.[0] ?? '',
+    );
+    expect(msg).toContain('"weird-rel"');
+    expect(msg).toContain('on edge a-b-0');
+    expect(msg).toContain('Falling back to unknown style');
   });
 
   it('loading a project with different projectHash → tracker resets (re-triggers warns)', () => {
@@ -386,6 +437,62 @@ describe('seed rehydration precedence', () => {
     const beta = secondNodes.find((n) => n.id === 'beta')!;
     expect(beta.position.x).toBe(300);
     expect(beta.position.y).toBe(400);
+  });
+
+  it('case F: all-identical seeds → dagre runs (positions are not all 0,0)', () => {
+    const seeds = new Map<string, NodePosition>([
+      ['a', { x: 0, y: 0 }],
+      ['b', { x: 0, y: 0 }],
+      ['c', { x: 0, y: 0 }],
+    ]);
+    const proj = makeProject(
+      [makeNode('a'), makeNode('b'), makeNode('c')],
+      [makeConnection('a', 'b'), makeConnection('b', 'c')],
+      'hash-f',
+    );
+
+    const { setNodes } = renderSync(proj, seeds);
+
+    const nodes = setNodes.mock.calls.at(-1)![0];
+    expect(nodes).toHaveLength(3);
+    // All dagre positions should not be identical {0,0}
+    const uniquePositions = new Set(nodes.map((n) => `${n.position.x}_${n.position.y}`));
+    expect(uniquePositions.size).toBeGreaterThan(1);
+  });
+
+  it('case G: relayoutRequestId increment forces dagre re-run, changing all positions', () => {
+    const seeds = new Map<string, NodePosition>([
+      ['a', { x: 100, y: 100 }],
+      ['b', { x: 200, y: 200 }],
+      ['c', { x: 300, y: 300 }],
+    ]);
+    const proj = makeProject(
+      [makeNode('a'), makeNode('b'), makeNode('c')],
+      [makeConnection('a', 'b'), makeConnection('b', 'c')],
+      'hash-g',
+    );
+
+    const { setNodes, rerender } = renderSync(proj, seeds, 0);
+
+    // After first render with seeds applied, positions come from seeds
+    const firstNodes = setNodes.mock.calls.at(-1)![0];
+    const firstPositions = new Map(firstNodes.map((n) => [n.id, n.position]));
+
+    // Trigger relayout by incrementing relayoutRequestId
+    act(() => {
+      rerender({ project: proj, seedPositions: seeds, relayoutRequestId: 1 });
+    });
+
+    const secondNodes = setNodes.mock.calls.at(-1)![0];
+    expect(secondNodes).toHaveLength(3);
+    // Positions should have changed from seed values (dagre ran)
+    const secondPositions = new Map(secondNodes.map((n) => [n.id, n.position]));
+    const allUnchanged = ['a', 'b', 'c'].every(
+      (id) =>
+        secondPositions.get(id)!.x === firstPositions.get(id)!.x &&
+        secondPositions.get(id)!.y === firstPositions.get(id)!.y,
+    );
+    expect(allUnchanged).toBe(false);
   });
 
   it('case E: empty-then-populated two-pass — seed wins on populated pass', () => {

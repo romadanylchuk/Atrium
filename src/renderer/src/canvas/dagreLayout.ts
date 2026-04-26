@@ -2,11 +2,11 @@ import dagre from 'dagre';
 import type { NodePosition } from '@shared/layout';
 
 export const DAGRE_RANKDIR = 'TB' as const;
-export const NODESEP = 60;
-export const RANKSEP = 120;
+export const NODESEP = 30;
+export const RANKSEP = 40;
 
-const DEFAULT_NODE_WIDTH = 150;
-const DEFAULT_NODE_HEIGHT = 50;
+const DEFAULT_NODE_WIDTH = 96;
+const DEFAULT_NODE_HEIGHT = 36;
 
 export function computeDagrePositions(
   nodes: Array<{ slug: string; width?: number; height?: number }>,

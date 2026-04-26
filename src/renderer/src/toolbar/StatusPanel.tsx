@@ -1,6 +1,8 @@
 import type { JSX } from 'react';
 import type { NodeMaturity } from '@shared/domain';
 import type { ProjectState } from '@shared/domain';
+import { useAtriumStore } from '@renderer/store/atriumStore';
+import { dispatchDetachedSkill } from '@renderer/skill/dispatchDetachedSkill';
 
 const MATURITY_ORDER: NodeMaturity[] = ['raw-idea', 'explored', 'decided', 'ready'];
 
@@ -10,6 +12,8 @@ type Props = {
 };
 
 export function StatusPanel({ project, onClose }: Props): JSX.Element {
+  const detachedStatusKind = useAtriumStore((s) => s.detachedRuns.status.kind);
+
   const byMaturity = new Map<string, string[]>();
   for (const n of project.nodes) {
     const group = byMaturity.get(n.maturity) ?? [];
@@ -28,11 +32,8 @@ export function StatusPanel({ project, onClose }: Props): JSX.Element {
       role="dialog"
       aria-label="Project Status"
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        position: 'absolute',
+        inset: 0,
         background: 'rgba(0,0,0,0.5)',
         display: 'flex',
         alignItems: 'flex-start',
@@ -80,14 +81,27 @@ export function StatusPanel({ project, onClose }: Props): JSX.Element {
           <p style={{ opacity: 0.6 }}>No nodes in this project.</p>
         )}
 
-        <button
-          type="button"
-          data-testid="status-panel-close"
-          onClick={onClose}
-          style={{ marginTop: 16 }}
-        >
-          Close
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <button
+            type="button"
+            data-testid="status-panel-close"
+            onClick={onClose}
+          >
+            Close
+          </button>
+
+          <button
+            type="button"
+            data-testid="status-panel-more"
+            disabled={detachedStatusKind === 'waiting'}
+            onClick={() => {
+              useAtriumStore.getState().clearDetachedRunError('status');
+              void dispatchDetachedSkill({ skill: 'status', cwd: project.rootPath });
+            }}
+          >
+            {detachedStatusKind === 'waiting' ? 'Waiting…' : 'More Status'}
+          </button>
+        </div>
       </div>
     </div>
   );

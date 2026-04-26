@@ -52,7 +52,40 @@ describe('composeCommand', () => {
     ]);
   });
 
-  it.each(['init', 'explore', 'decide', 'map', 'finalize'] as const)(
+  it('new returns /architector:new', () => {
+    expect(composeCommand({ skill: 'new' })).toEqual(['claude', '/architector:new']);
+  });
+
+  it('triage with single node', () => {
+    expect(composeCommand({ skill: 'triage', nodes: ['auth-node'] })).toEqual([
+      'claude',
+      '/architector:triage auth-node',
+    ]);
+  });
+
+  it('triage with multiple nodes', () => {
+    expect(composeCommand({ skill: 'triage', nodes: ['a', 'b'] })).toEqual([
+      'claude',
+      '/architector:triage a b',
+    ]);
+  });
+
+  it('triage with no nodes degrades to no-slugs form', () => {
+    expect(composeCommand({ skill: 'triage', nodes: [] })).toEqual([
+      'claude',
+      '/architector:triage',
+    ]);
+  });
+
+  it('audit returns /architector:audit', () => {
+    expect(composeCommand({ skill: 'audit' })).toEqual(['claude', '/architector:audit']);
+  });
+
+  it('status returns /architector:status', () => {
+    expect(composeCommand({ skill: 'status' })).toEqual(['claude', '/architector:status']);
+  });
+
+  it.each(['init', 'explore', 'decide', 'map', 'finalize', 'free', 'new', 'triage', 'audit', 'status'] as const)(
     '%s: args must not contain --append-system-prompt-file',
     (skill) => {
       const args = composeCommand({ skill, nodes: ['some-node'], prompt: 'p' });

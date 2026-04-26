@@ -60,6 +60,32 @@ test('Scenario 3 — Terminal: spawn, receive output, kill, close', async () => 
 
     // Canvas (MainShell) is still visible
     await expect(mainShell).toBeVisible();
+
+    // --- Regression: second spawn must succeed after close ---
+    // The bug this scenario guards against: TerminalManager stayed 'exited',
+    // so every subsequent skill spawn toasted "terminal not idle".
+    await page.evaluate(() => { (window as Record<string, unknown>).__e2e_terminalOutput = ''; });
+    await exploreBtn.click();
+    await expect(terminalModal).toBeVisible({ timeout: 10_000 });
+
+    // Second run must reach active and emit HELLO_ATRIUM again.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () => (window as Record<string, unknown>)['__e2e_terminalOutput'] as string ?? '',
+          ),
+        { timeout: 10_000, intervals: [300] },
+      )
+      .toContain('HELLO_ATRIUM');
+
+    // Clean up for the test runner.
+    const killBtn2 = page.getByRole('button', { name: 'Kill terminal' });
+    await killBtn2.click();
+    const closeBtn2 = page.getByRole('button', { name: 'Close terminal' });
+    await expect(closeBtn2).toBeEnabled({ timeout: 10_000 });
+    await closeBtn2.click();
+    await expect(terminalModal).not.toBeVisible({ timeout: 5_000 });
   } finally {
     await app.close();
   }

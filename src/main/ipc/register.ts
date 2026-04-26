@@ -17,8 +17,11 @@ import { registerTerminalHandlers } from './terminal';
 import { registerHealthHandlers } from './health';
 import { registerLayoutHandlers } from './layout';
 import { registerSkillHandlers } from './skill';
+import { registerConsultationHandlers } from './consultation';
+import { registerShellHandlers } from './shell';
 import { TerminalManager } from '@main/terminal';
 import { WatcherManager } from '@main/fileSync';
+import { ConsultationService } from '@main/consultation/consultationService';
 
 // Module-level idempotency guard — reset only possible in tests via the exported setter.
 let registered = false;
@@ -36,12 +39,16 @@ export function __resetRegisteredForTests(): void {
  */
 export function registerIpc(
   getWindow: () => BrowserWindow | null,
-  managers: { terminalManager: TerminalManager; watcherManager: WatcherManager },
+  managers: {
+    terminalManager: TerminalManager;
+    watcherManager: WatcherManager;
+    consultationService: ConsultationService;
+  },
 ): void {
   if (registered) return;
   registered = true;
 
-  const { terminalManager, watcherManager } = managers;
+  const { terminalManager, watcherManager, consultationService } = managers;
 
   registerProjectHandlers(watcherManager);
   registerDialogHandlers(getWindow);
@@ -50,4 +57,6 @@ export function registerIpc(
   registerHealthHandlers();
   registerLayoutHandlers();
   registerSkillHandlers(terminalManager);
+  registerConsultationHandlers(consultationService);
+  registerShellHandlers();
 }

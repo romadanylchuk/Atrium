@@ -7,7 +7,7 @@ export function SidePanel(): JSX.Element {
   const activePanel = useAtriumStore((s) => s.activePanel);
 
   return (
-    <div data-testid="side-panel" style={{ width: '100%', height: '100%', overflow: 'auto' }}>
+    <div data-testid="side-panel" style={{ width: '100%', height: '100%' }}>
       {activePanel === 'project' ? <ProjectPanel /> : <SelectionPanel />}
     </div>
   );

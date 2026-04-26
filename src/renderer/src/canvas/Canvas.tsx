@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import ReactFlow, {
   ReactFlowProvider,
+  Background,
+  BackgroundVariant,
   useNodesState,
   useEdgesState,
   type Node,
@@ -17,15 +19,19 @@ import { AtriumNode, type AtriumNodeData } from './AtriumNode';
 import { AtriumEdge } from './AtriumEdge';
 import { CanvasEmptyState } from './CanvasEmptyState';
 import { CanvasErrorState } from './CanvasErrorState';
+import { Legend } from './Legend';
+import { CanvasControls } from './CanvasControls';
 
 const nodeTypes = { atriumNode: AtriumNode };
 const edgeTypes = { atriumEdge: AtriumEdge };
+const FIT_VIEW_OPTIONS = { maxZoom: 1.2 } as const;
 
 function CanvasInner() {
   const canvas = useAtriumStore((s) => s.canvas);
   const project = useAtriumStore((s) => s.project);
   const clearSelection = useAtriumStore((s) => s.clearSelection);
   const setTooltipTarget = useAtriumStore((s) => s.setTooltipTarget);
+  const relayoutRequestId = useAtriumStore((s) => s.relayoutRequestId);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<AtriumNodeData>([]);
   const [edges, setEdges] = useEdgesState<Edge[]>([]);
@@ -74,6 +80,7 @@ function CanvasInner() {
     seedPositions,
     setNodes: setNodes as (nodes: Node[]) => void,
     setEdges: setEdges as (edges: Edge[]) => void,
+    relayoutRequestId,
   });
 
   const handleNodesChange: OnNodesChange = useCallback(
@@ -95,7 +102,7 @@ function CanvasInner() {
   }, []);
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div style={{ width: '100%', height: '100%', position: 'relative', background: '#0f0f13' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -104,6 +111,7 @@ function CanvasInner() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
+        fitViewOptions={FIT_VIEW_OPTIONS}
         onPaneClick={() => {
           clearSelection();
           setTooltipTarget(null);
@@ -112,7 +120,11 @@ function CanvasInner() {
           e.preventDefault();
           clearSelection();
         }}
-      />
+      >
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#1f1f26" />
+      </ReactFlow>
+      <CanvasControls />
+      <Legend />
       {canvas.kind === 'empty' && <CanvasEmptyState />}
       {canvas.kind === 'error' && <CanvasErrorState message={canvas.message} />}
     </div>

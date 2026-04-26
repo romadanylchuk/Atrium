@@ -9,17 +9,20 @@ test('Scenario 1 — Launch: health check passes, launcher renders with no recen
     const gate = page.locator('[aria-modal="true"]');
     await expect(gate).toBeVisible({ timeout: 15_000 });
 
-    // Open button must be present and enabled
-    const openBtn = page.getByRole('button', { name: 'Open' });
-    await expect(openBtn).toBeVisible();
-    await expect(openBtn).toBeEnabled();
-
-    // No recent projects yet — RecentsList shows empty text
+    // No recent projects yet — gate shows empty text
     await expect(page.getByText('No recent projects.')).toBeVisible();
 
-    // Health check must resolve to ok (fake-claude prints a version matching \d+\.\d+\.\d+)
-    // HealthSection renders "Claude <version> found." when ok
-    await expect(page.getByText(/Claude .* found\./)).toBeVisible({ timeout: 15_000 });
+    // Bottom health-line shows both dependencies resolved.
+    // Scoped to the testid to avoid matching the DEPENDENCIES section's role="status" elements
+    // (which also render claudeLine text while pluginStatus is still 'checking').
+    const healthLine = page.getByTestId('launch-health-line');
+    await expect(healthLine.getByText(/claude .* · healthy/)).toBeVisible({ timeout: 15_000 });
+    await expect(healthLine.getByText(/architector .* · present/)).toBeVisible({ timeout: 15_000 });
+
+    // Gate fully unlocked — Open button must be present and enabled (both dependencies satisfied)
+    const openBtn = page.getByRole('button', { name: 'Open project…' });
+    await expect(openBtn).toBeVisible();
+    await expect(openBtn).toBeEnabled();
   } finally {
     await app.close();
   }

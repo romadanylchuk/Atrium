@@ -13,7 +13,7 @@ import type { Result } from '@shared/result.js';
 import type { HealthInfo } from '@shared/domain.js';
 import { resolveClaudeBin } from './resolveClaudeBin.js';
 
-export const HEALTH_TIMEOUT_MS = 5000;
+export const HEALTH_TIMEOUT_MS = 5_000;
 
 export async function checkClaude(): Promise<Result<HealthInfo, typeof HealthErrorCode[keyof typeof HealthErrorCode]>> {
   let claudePath: string;

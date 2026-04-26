@@ -50,7 +50,51 @@ describe('AtriumNode unknown maturity', () => {
 });
 
 // ---------------------------------------------------------------------------
-// AtriumEdge — unknown connection-type DOM round-trip
+// AtriumNode — node dimensions and palette
+// ---------------------------------------------------------------------------
+
+describe('AtriumNode visual style', () => {
+  it('ready node renders with border-radius 6px', () => {
+    const props = {
+      data: { slug: 'x', name: 'X', maturity: 'ready' },
+    } as unknown as NodeProps<AtriumNodeData>;
+    const { container } = render(<AtriumNode {...props} />);
+    const el = container.firstElementChild as HTMLElement;
+    expect(el.style.borderRadius).toBe('6px');
+  });
+
+  it('decided node renders with border-radius 3px', () => {
+    const props = {
+      data: { slug: 'x', name: 'X', maturity: 'decided' },
+    } as unknown as NodeProps<AtriumNodeData>;
+    const { container } = render(<AtriumNode {...props} />);
+    const el = container.firstElementChild as HTMLElement;
+    expect(el.style.borderRadius).toBe('3px');
+  });
+
+  it('raw-idea node renders with border-radius 50% / 50%', () => {
+    const props = {
+      data: { slug: 'x', name: 'X', maturity: 'raw-idea' },
+    } as unknown as NodeProps<AtriumNodeData>;
+    const { container } = render(<AtriumNode {...props} />);
+    const el = container.firstElementChild as HTMLElement;
+    // CSS ellipse approximation
+    expect(el.style.borderRadius).toContain('50%');
+  });
+
+  it('node has width 96px and height 36px', () => {
+    const props = {
+      data: { slug: 'x', name: 'X', maturity: 'explored' },
+    } as unknown as NodeProps<AtriumNodeData>;
+    const { container } = render(<AtriumNode {...props} />);
+    const el = container.firstElementChild as HTMLElement;
+    expect(el.style.width).toBe('96px');
+    expect(el.style.height).toBe('36px');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AtriumEdge — unknown connection-type DOM round-trip + hover tooltip
 // ---------------------------------------------------------------------------
 
 describe('AtriumEdge unknown connection type', () => {
@@ -89,17 +133,153 @@ describe('AtriumEdge unknown connection type', () => {
 
     const label = container.querySelector('[data-unknown-type="unknown-rel"]');
     expect(label).not.toBeNull();
-    expect(label!.textContent).toContain('unknown-rel');
+  });
+
+  it('unknown edge tooltip is hidden by default', () => {
+    const props = {
+      ...baseEdgeProps,
+      data: { type: 'unknown-rel' },
+    } as unknown as EdgeProps<AtriumEdgeData>;
+
+    const { container } = render(<AtriumEdge {...props} />);
+    const label = container.querySelector('[data-unknown-type="unknown-rel"]') as HTMLElement;
+    expect(label.style.display).toBe('none');
+  });
+
+  it('unknown edge tooltip appears on hover and disappears on mouse leave', () => {
+    const props = {
+      ...baseEdgeProps,
+      data: { type: 'unknown-rel' },
+    } as unknown as EdgeProps<AtriumEdgeData>;
+
+    const { container } = render(<AtriumEdge {...props} />);
+    const wrapper = container.querySelector('.nodrag') as HTMLElement;
+    const label = container.querySelector('[data-unknown-type="unknown-rel"]') as HTMLElement;
+
+    fireEvent.mouseEnter(wrapper);
+    expect(label.style.display).toBe('block');
+    expect(label.textContent).toContain('unknown-rel');
+
+    fireEvent.mouseLeave(wrapper);
+    expect(label.style.display).toBe('none');
   });
 
   it('does NOT render data-unknown-type for a known connection type', () => {
     const props = {
       ...baseEdgeProps,
-      data: { type: 'depends-on' },
+      data: { type: 'dependency' },
     } as unknown as EdgeProps<AtriumEdgeData>;
 
     const { container } = render(<AtriumEdge {...props} />);
 
+    expect(container.querySelector('[data-unknown-type]')).toBeNull();
+  });
+
+  it('renders data-known-type attribute for a known connection type', () => {
+    const props = {
+      ...baseEdgeProps,
+      data: { type: 'dependency' },
+    } as unknown as EdgeProps<AtriumEdgeData>;
+
+    const { container } = render(<AtriumEdge {...props} />);
+
+    expect(container.querySelector('[data-known-type="dependency"]')).not.toBeNull();
+    expect(container.querySelector('[data-unknown-type]')).toBeNull();
+  });
+
+  it('known edge tooltip is hidden by default', () => {
+    const props = {
+      ...baseEdgeProps,
+      data: { type: 'dependency' },
+    } as unknown as EdgeProps<AtriumEdgeData>;
+
+    const { container } = render(<AtriumEdge {...props} />);
+    const label = container.querySelector('[data-known-type="dependency"]') as HTMLElement;
+    expect(label.style.display).toBe('none');
+  });
+
+  it('known edge tooltip shows "type: dependency" on hover', () => {
+    const props = {
+      ...baseEdgeProps,
+      data: { type: 'dependency' },
+    } as unknown as EdgeProps<AtriumEdgeData>;
+
+    const { container } = render(<AtriumEdge {...props} />);
+    const wrapper = container.querySelector('.nodrag') as HTMLElement;
+    const label = container.querySelector('[data-known-type="dependency"]') as HTMLElement;
+
+    fireEvent.mouseEnter(wrapper);
+    expect(label.style.display).toBe('block');
+    expect(label.textContent).toBe('type: dependency');
+    fireEvent.mouseLeave(wrapper);
+    expect(label.style.display).toBe('none');
+  });
+
+  it('unknown edge tooltip shows "type: weird-rel (unknown)" on hover', () => {
+    const props = {
+      ...baseEdgeProps,
+      data: { type: 'weird-rel' },
+    } as unknown as EdgeProps<AtriumEdgeData>;
+
+    const { container } = render(<AtriumEdge {...props} />);
+    const wrapper = container.querySelector('.nodrag') as HTMLElement;
+    const label = container.querySelector('[data-unknown-type="weird-rel"]') as HTMLElement;
+
+    fireEvent.mouseEnter(wrapper);
+    expect(label.style.display).toBe('block');
+    expect(label.textContent).toBe('type: weird-rel (unknown)');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AtriumEdge — known edge stroke styles
+// ---------------------------------------------------------------------------
+
+describe('AtriumEdge stroke styles', () => {
+  const baseEdgeProps = {
+    id: 'e1',
+    sourceX: 0,
+    sourceY: 0,
+    targetX: 100,
+    targetY: 100,
+    sourcePosition: 'bottom',
+    targetPosition: 'top',
+    source: 'a',
+    target: 'b',
+    selected: false,
+    animated: false,
+    interactionWidth: 20,
+    markerStart: undefined,
+    markerEnd: undefined,
+    style: {},
+    label: undefined,
+    labelStyle: {},
+    labelShowBg: false,
+    labelBgStyle: {},
+    labelBgPadding: [0, 0] as [number, number],
+    labelBgBorderRadius: 0,
+    pathOptions: {},
+  };
+
+  // BaseEdge is mocked to null so we test via the absence of data-unknown-type
+  // and the fact that no EdgeLabelRenderer is rendered for known types
+  it('shared-concern edge does not render unknown-type label', () => {
+    const props = {
+      ...baseEdgeProps,
+      data: { type: 'shared-concern' },
+    } as unknown as EdgeProps<AtriumEdgeData>;
+
+    const { container } = render(<AtriumEdge {...props} />);
+    expect(container.querySelector('[data-unknown-type]')).toBeNull();
+  });
+
+  it('dependency edge does not render unknown-type label', () => {
+    const props = {
+      ...baseEdgeProps,
+      data: { type: 'dependency' },
+    } as unknown as EdgeProps<AtriumEdgeData>;
+
+    const { container } = render(<AtriumEdge {...props} />);
     expect(container.querySelector('[data-unknown-type]')).toBeNull();
   });
 });

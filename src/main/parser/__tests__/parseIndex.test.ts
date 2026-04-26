@@ -124,7 +124,7 @@ describe('parseIndex', () => {
     const json = JSON.stringify({
       project: 'Test',
       nodes: [],
-      connections: [{ from: 'a', to: 'b', type: 'depends-on', note: 'important' }],
+      connections: [{ from: 'a', to: 'b', type: 'dependency', note: 'important' }],
       sessions: [],
     });
     const result = parseIndex(json);

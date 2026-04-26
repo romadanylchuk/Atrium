@@ -57,17 +57,21 @@ function flattenIpc(): string[] {
 }
 
 // Push channels (main→renderer) that are NOT registered on main side:
-//   fileSync:onChanged — webContents.send, no ipcMain registration
-//   terminal:onData    — webContents.send, no ipcMain registration
-//   terminal:onExit    — webContents.send, no ipcMain registration
-//   terminal:onError   — webContents.send, no ipcMain registration
-//
+//   fileSync:onChanged            — webContents.send, no ipcMain registration
+//   terminal:onData               — webContents.send, no ipcMain registration
+//   terminal:onExit               — webContents.send, no ipcMain registration
+//   terminal:onError              — webContents.send, no ipcMain registration
+//   consultation:stream:*         — webContents.send, no ipcMain registration
 const PUSH_ONLY_CHANNELS = new Set<string>([
   IPC.fileSync.onChanged,
   IPC.terminal.onData,
   IPC.terminal.onExit,
   IPC.terminal.onError,
+  IPC.consultation.streamChunk,
+  IPC.consultation.streamComplete,
+  IPC.consultation.streamError,
 ]);
+
 
 // ---------------------------------------------------------------------------
 // Setup / teardown
@@ -96,6 +100,7 @@ afterEach(() => {
 const fakeTerminalManager = {
   spawn: () => ({ ok: false as const, error: { code: 'SPAWN_FAILED', message: 'stub' } }),
   kill: () => ({ ok: false as const, error: { code: 'KILL_FAILED', message: 'stub' } }),
+  closeAfterExit: () => ({ ok: true as const, data: undefined }),
   write: () => {},
   resize: () => {},
 };
@@ -105,10 +110,20 @@ const fakeWatcherManager = {
   stop: () => Promise.resolve({ ok: true as const, data: undefined }),
 };
 
+const fakeConsultationService = {
+  loadThread: () => Promise.resolve({ ok: true as const, data: null }),
+  sendMessage: () => Promise.resolve({ ok: true as const, data: { messageId: 'm' } }),
+  newSession: () =>
+    Promise.resolve({ ok: true as const, data: { sessionId: 's', systemPromptVersion: 1 } }),
+  cancel: () => Promise.resolve({ ok: true as const, data: undefined }),
+  cancelAllForProject: () => {},
+  setWindow: () => {},
+};
+
 describe('registerIpc', () => {
   it('registers all non-push IPC channels exactly once', async () => {
     const { registerIpc } = await import('../register');
-    registerIpc(() => null, { terminalManager: fakeTerminalManager as never, watcherManager: fakeWatcherManager as never });
+    registerIpc(() => null, { terminalManager: fakeTerminalManager as never, watcherManager: fakeWatcherManager as never, consultationService: fakeConsultationService as never });
 
     const allChannels = flattenIpc();
     for (const ch of allChannels) {
@@ -121,7 +136,11 @@ describe('registerIpc', () => {
   it('is idempotent — second call does not add duplicate handlers', async () => {
     const { registerIpc } = await import('../register');
 
-    const managers = { terminalManager: fakeTerminalManager as never, watcherManager: fakeWatcherManager as never };
+    const managers = {
+      terminalManager: fakeTerminalManager as never,
+      watcherManager: fakeWatcherManager as never,
+      consultationService: fakeConsultationService as never,
+    };
     registerIpc(() => null, managers);
     const handleCountAfterFirst = handleMap.size;
     const onCountAfterFirst = onMap.size;
@@ -134,7 +153,7 @@ describe('registerIpc', () => {
 
   it('push-only channels (main→renderer) are NOT registered via ipcMain', async () => {
     const { registerIpc } = await import('../register');
-    registerIpc(() => null, { terminalManager: fakeTerminalManager as never, watcherManager: fakeWatcherManager as never });
+    registerIpc(() => null, { terminalManager: fakeTerminalManager as never, watcherManager: fakeWatcherManager as never, consultationService: fakeConsultationService as never });
 
     for (const ch of PUSH_ONLY_CHANNELS) {
       expect(handleMap.has(ch), `Push channel "${ch}" should NOT be in handleMap`).toBe(false);
@@ -144,7 +163,7 @@ describe('registerIpc', () => {
 
   it('invoke channels are in handleMap (not onMap)', async () => {
     const { registerIpc } = await import('../register');
-    registerIpc(() => null, { terminalManager: fakeTerminalManager as never, watcherManager: fakeWatcherManager as never });
+    registerIpc(() => null, { terminalManager: fakeTerminalManager as never, watcherManager: fakeWatcherManager as never, consultationService: fakeConsultationService as never });
 
     // Channels that should be invoke-registered (handle), not on-registered
     const invokeChannels = [
@@ -156,10 +175,18 @@ describe('registerIpc', () => {
       IPC.fileSync.stopWatching,
       IPC.terminal.spawn,
       IPC.terminal.kill,
+      IPC.terminal.close,
       IPC.health.checkClaude,
+      IPC.health.checkPlugin,
+      IPC.health.installPlugin,
+      IPC.health.cancelInstall,
       IPC.layout.load,
       IPC.layout.save,
       IPC.skill.spawn,
+      IPC.consultation.loadThread,
+      IPC.consultation.sendMessage,
+      IPC.consultation.newSession,
+      IPC.consultation.cancel,
     ];
 
     for (const ch of invokeChannels) {
@@ -169,7 +196,7 @@ describe('registerIpc', () => {
 
   it('fire-and-forget channels are in onMap (not handleMap)', async () => {
     const { registerIpc } = await import('../register');
-    registerIpc(() => null, { terminalManager: fakeTerminalManager as never, watcherManager: fakeWatcherManager as never });
+    registerIpc(() => null, { terminalManager: fakeTerminalManager as never, watcherManager: fakeWatcherManager as never, consultationService: fakeConsultationService as never });
 
     expect(onMap.has(IPC.terminal.write)).toBe(true);
     expect(onMap.has(IPC.terminal.resize)).toBe(true);

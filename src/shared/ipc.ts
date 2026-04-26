@@ -26,6 +26,7 @@ export const IPC = {
   terminal: {
     spawn: 'terminal:spawn',
     kill: 'terminal:kill',
+    close: 'terminal:close',
     write: 'terminal:write',
     resize: 'terminal:resize',
     onData: 'terminal:onData',
@@ -34,6 +35,9 @@ export const IPC = {
   },
   health: {
     checkClaude: 'health:checkClaude',
+    checkPlugin: 'health:checkPlugin',
+    installPlugin: 'health:installPlugin',
+    cancelInstall: 'health:cancelInstall',
   },
   layout: {
     load: 'layout:load',
@@ -42,5 +46,18 @@ export const IPC = {
   },
   skill: {
     spawn: 'skill:spawn',
+    runDetached: 'skill:runDetached',
+  },
+  consultation: {
+    sendMessage: 'consultation:sendMessage',
+    loadThread: 'consultation:loadThread',
+    newSession: 'consultation:newSession',
+    cancel: 'consultation:cancel',
+    streamChunk: 'consultation:stream:chunk',
+    streamComplete: 'consultation:stream:complete',
+    streamError: 'consultation:stream:error',
+  },
+  shell: {
+    openExternal: 'shell:openExternal',
   },
 } as const;

@@ -15,6 +15,13 @@ if (args[0] === '--version') {
   process.exit(0);
 }
 
+if (args[0] === 'plugin' && args[1] === 'list' && args.includes('--json')) {
+  process.stdout.write(
+    JSON.stringify([{ id: 'architector@getleverage', version: '1.0.0-e2e', enabled: true, scope: 'user' }]) + '\n',
+  );
+  process.exit(0);
+}
+
 // For skill invocations: emit the sentinel and block until SIGTERM/SIGINT.
 process.stdout.write('HELLO_ATRIUM\r\n');
 

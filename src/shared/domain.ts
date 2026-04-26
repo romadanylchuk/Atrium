@@ -22,7 +22,9 @@ export type NodePriority = 'blocking' | 'core' | 'enhancement' | 'deferred';
 
 export type NodeMaturity = 'raw-idea' | 'explored' | 'decided' | 'ready';
 
-export type ConnectionType = 'depends-on' | 'informs' | 'extends' | 'feeds' | 'uses';
+import type { ConnectionType } from './schema/aiArch';
+export type { ConnectionType } from './schema/aiArch';
+import type { HealthErrorCode } from './errors';
 
 // ---------------------------------------------------------------------------
 // Structured warnings (partial-failure surface from the parser)
@@ -114,3 +116,25 @@ export type HealthInfo = {
   readonly claudePath: string;
   readonly version: string;
 };
+
+export type PluginInfo = {
+  readonly pluginId: 'architector@getleverage';
+  readonly version: string;
+  readonly enabled: boolean;
+};
+
+type InstallFailureCode = Extract<
+  HealthErrorCode,
+  'INSTALL_FAILED' | 'INSTALL_TIMEOUT' | 'INSTALL_CANCELLED' | 'PLUGIN_NOT_FOUND'
+>;
+
+export type InstallOutcome =
+  | { readonly kind: 'success'; readonly pluginInfo: PluginInfo }
+  | {
+      readonly kind: 'failed';
+      readonly step: 'marketplace-add' | 'install' | 'post-probe';
+      readonly code: InstallFailureCode;
+      readonly message: string;
+      readonly stdout: string;
+      readonly stderr: string;
+    };

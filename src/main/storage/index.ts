@@ -2,7 +2,7 @@
  * Barrel export for src/main/storage/.
  *
  * Consumers:
- *   import { getUserDataDir, getConfigPath, … } from '@main/storage';
+ *   import { getUserDataDir, getConfigPath, getConsultationPath, … } from '@main/storage';
  *   import { hashProjectPath, hashKeyOnly, slugify, normalizePath } from '@main/storage';
  *   import { atomicWriteJson } from '@main/storage';
  *   import { loadAppConfig, saveAppConfig, bumpRecent, getRecents } from '@main/storage';
@@ -17,6 +17,7 @@ export {
   getProjectDir,
   getLayoutPath,
   getMetaPath,
+  getConsultationPath,
 } from './paths.js';
 
 export {

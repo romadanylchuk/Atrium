@@ -2,9 +2,10 @@ import { useEffect, useRef, useCallback, type JSX } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { useAtriumStore } from '../store/atriumStore';
-import { decideNextTerminalState } from './terminalState';
-import { resolveInitOutcome } from './terminalState';
+import { decideNextTerminalState, resolveInitOutcome } from './terminalState';
 import { XTERM_THEME, XTERM_FONT_FAMILY } from './xtermTheme';
+import { decideClipboardAction } from './clipboardKeymap';
+import { encodeBracketedPaste } from './bracketedPaste';
 import 'xterm/css/xterm.css';
 
 declare global {
@@ -51,6 +52,43 @@ export function TerminalModal(): JSX.Element | null {
     xterm.loadAddon(fitAddon);
     xterm.open(containerRef.current);
     fitAddon.fit();
+
+    xterm.attachCustomKeyEventHandler((e: KeyboardEvent): boolean => {
+      const selection = xterm.hasSelection() ? xterm.getSelection() : '';
+      const { id: currentId, status: currentStatus } = useAtriumStore.getState().terminal;
+      const action = decideClipboardAction(e, { hasSelection: selection.length > 0, status: currentStatus });
+      switch (action.kind) {
+        case 'passthrough':
+          return true;
+        case 'swallow':
+          e.preventDefault();
+          return false;
+        case 'copy-selection':
+          e.preventDefault();
+          void navigator.clipboard.writeText(selection).catch(() => {});
+          xterm.clearSelection();
+          return false;
+        case 'paste':
+          e.preventDefault();
+          void navigator.clipboard
+            .readText()
+            .then((text) => {
+              if (!text || !currentId) return;
+              if (useAtriumStore.getState().terminal.status !== 'active') return;
+              const wrapped = encodeBracketedPaste(text);
+              if (!wrapped) return;
+              const enc = new TextEncoder().encode(wrapped);
+              window.atrium.terminal.write(currentId, enc.buffer);
+            })
+            .catch(() => {});
+          return false;
+        default: {
+          const _exhaustive: never = action;
+          void _exhaustive;
+          return true;
+        }
+      }
+    });
 
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
@@ -184,8 +222,8 @@ export function TerminalModal(): JSX.Element | null {
   if (!visible) return null;
 
   const overlayStyle: React.CSSProperties = {
-    position: 'fixed',
-    inset: fullscreen ? 0 : '5vh 5vw',
+    position: 'absolute',
+    inset: fullscreen ? 0 : '8px',
     zIndex: 200,
     display: 'flex',
     flexDirection: 'column',

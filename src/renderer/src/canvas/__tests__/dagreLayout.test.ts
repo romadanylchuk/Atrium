@@ -1,10 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { computeDagrePositions } from '../dagreLayout';
+import { computeDagrePositions, NODESEP, RANKSEP } from '../dagreLayout';
 import type { NodePosition } from '@shared/layout';
 
 function makeNodes(slugs: string[]) {
   return slugs.map((slug) => ({ slug }));
 }
+
+describe('dagre constants', () => {
+  it('NODESEP is 30', () => {
+    expect(NODESEP).toBe(30);
+  });
+
+  it('RANKSEP is 40', () => {
+    expect(RANKSEP).toBe(40);
+  });
+});
 
 describe('computeDagrePositions', () => {
   it('(a) empty existing + 3 new → 3 positions returned, all finite numbers', () => {

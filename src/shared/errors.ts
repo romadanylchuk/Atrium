@@ -96,6 +96,12 @@ export const HealthErrorCode = {
   CLAUDE_NOT_FOUND: 'CLAUDE_NOT_FOUND',
   VERSION_UNPARSEABLE: 'VERSION_UNPARSEABLE',
   HEALTH_TIMEOUT: 'HEALTH_TIMEOUT',
+  PLUGIN_NOT_FOUND: 'PLUGIN_NOT_FOUND',
+  PLUGIN_LIST_UNAVAILABLE: 'PLUGIN_LIST_UNAVAILABLE',
+  PLUGIN_PROBE_TIMEOUT: 'PLUGIN_PROBE_TIMEOUT',
+  INSTALL_FAILED: 'INSTALL_FAILED',
+  INSTALL_TIMEOUT: 'INSTALL_TIMEOUT',
+  INSTALL_CANCELLED: 'INSTALL_CANCELLED',
 } as const;
 
 export type HealthErrorCode = (typeof HealthErrorCode)[keyof typeof HealthErrorCode];
@@ -109,6 +115,29 @@ export const SkillErrorCode = {
   COMPOSE_FAILED: 'COMPOSE_FAILED',
   SPAWN_FAILED: 'SPAWN_FAILED',
   INVALID_SKILL: 'INVALID_SKILL',
+  RUN_FAILED: 'RUN_FAILED',
 } as const;
 
 export type SkillErrorCode = (typeof SkillErrorCode)[keyof typeof SkillErrorCode];
+
+// ---------------------------------------------------------------------------
+// Consultation
+// ---------------------------------------------------------------------------
+
+export const ConsultationErrorCode = {
+  ...CommonErrorCode,
+  CLAUDE_NOT_FOUND: 'CLAUDE_NOT_FOUND',
+  NOT_AUTHENTICATED: 'NOT_AUTHENTICATED',
+  QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  INVALID_OUTPUT: 'INVALID_OUTPUT',
+  BUDGET_EXCEEDED: 'BUDGET_EXCEEDED',
+  SESSION_LOST: 'SESSION_LOST',
+  IO_FAILED: 'IO_FAILED',
+  CORRUPT: 'CORRUPT',
+  SCHEMA_MISMATCH: 'SCHEMA_MISMATCH',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type ConsultationErrorCode =
+  (typeof ConsultationErrorCode)[keyof typeof ConsultationErrorCode];
