@@ -25,12 +25,8 @@ import type {
   LayoutFileV1,
   LayoutErrorCode,
   SkillErrorCode,
-  ConsultationFile,
-  ConsultationModel,
-  ConsultationErrorCode,
 } from '@shared/index';
 import type { SkillSpawnRequest } from '@shared/skill/spawn';
-import type { DetachedRunRequest, DetachedRunResult } from '@shared/skill/detached';
 
 export type AtriumAPI = {
   project: {
@@ -69,21 +65,9 @@ export type AtriumAPI = {
   };
   skill: {
     spawn(req: SkillSpawnRequest): Promise<Result<TerminalId, SkillErrorCode>>;
-    runDetached(req: DetachedRunRequest): Promise<Result<DetachedRunResult, SkillErrorCode>>;
   };
   consultation: {
-    loadThread(projectRoot: string):
-      Promise<Result<ConsultationFile | null, ConsultationErrorCode>>;
-    sendMessage(projectRoot: string, message: string):
-      Promise<Result<{ messageId: string }, ConsultationErrorCode>>;
-    newSession(projectRoot: string, model: ConsultationModel):
-      Promise<Result<{ sessionId: string; systemPromptVersion: number }, ConsultationErrorCode>>;
-    cancel(projectRoot: string, messageId: string):
-      Promise<Result<void, ConsultationErrorCode>>;
-    onStreamChunk(messageId: string, cb: (fullText: string) => void): () => void;
-    onStreamComplete(messageId: string, cb: (fullContent: string) => void): () => void;
-    onStreamError(messageId: string,
-      cb: (err: { code: ConsultationErrorCode; raw?: string }) => void): () => void;
+    spawnTerminal(args: { cwd: string }): Promise<Result<TerminalId, TerminalErrorCode>>;
   };
   shell: {
     openExternal(url: string): Promise<void>;

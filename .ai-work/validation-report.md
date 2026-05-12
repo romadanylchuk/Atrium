@@ -1,24 +1,18 @@
-# Validation Report: Toolbar additions & canvas-bounded popup geometry
-_Date: 2026-04-26_
+# Validation Report: Replace Consultation Chat Panel with Consultation Terminal
+_Date: 2026-04-28_
 
 ## Status: APPROVED
 
-## Issues Found (round 1)
-
-1. **Decision §1 / `DetachedSkillName` includes `'new'`** — the runtime never dispatches `'new'` as a `-p` run (it's an interactive skill). Including `'new'` in `DetachedSkillName` is dead surface and risks future confusion.
-
-2. **Phase 4 completion criterion uses "manual check"** — "with the app running, opening any popup keeps SidePanel and Chat fully visible" is not verifiable in CI. Need a deterministic assertion.
-
-3. **Phase 6 step 5 ambiguity** — "Easiest path: keep the assertion at the slice level and let CanvasRegionHost.test.tsx cover the render path" reads as a deferral rather than a concrete test target. The verifier won't know which file owns the integration coverage.
-
-4. **Phase 5 misses visual `data-active` semantics for new buttons** — the existing pattern relies on `data-active="true"` for highlighting; new buttons (Free, New, Triage, Audit) need explicit treatment, particularly Audit which never opens a panel and so should never set `data-active='true'`.
+## Issues Found
+1. **Phase 6 missing EdgeTab visibility guard.** The brief's edge case states "EdgeTab is hidden or
+   disabled when `project === null`". The original plan did not update `ConsultationRegion.tsx` to
+   check project state. Without this fix, clicking the EdgeTab with no project loaded would open
+   an empty panel where the terminal never spawns, producing a broken-looking UI.
 
 ## Fixes Applied
-
-1. Trimmed `DetachedSkillName` to `Extract<SkillName, 'audit' | 'status'>` in Changed Contracts and decision §1; updated initial slice to only `audit` and `status`.
-
-2. Replaced Phase 4's manual check with a deterministic assertion: a styles-grep test asserts that `TerminalModal`, `StatusPanel`, `FinalizePanel`, and `DetachedResultPopup` render with `position: 'absolute'` (no `'fixed'`) and that each is rendered as a descendant of `[data-region="canvas"]` in the integration tests.
-
-3. Phase 6 step 5 reworded: the slice→popup integration is owned by `CanvasRegionHost.test.tsx`. The dispatch path is owned by `dispatchDetachedSkill.test.ts`. The Toolbar test does not need to cover the popup render path.
-
-4. Phase 5 step 1 + step 3 amended: each new button gets a `data-active` attribute. Free/New/Triage follow the existing skill-button pattern (active while their tab was last clicked, until another tab takes focus). **Audit always renders `data-active='false'`** — clicking it never affects `activeTab` because it doesn't open a "tab"-style overlay.
+1. Added `src/renderer/src/consultation/ConsultationRegion.tsx` to the affected files table
+   (modify: add project-null guard, return null when `project === null`).
+2. Updated Phase 6 step 5 to explicitly update `ConsultationRegion.tsx` (3-line change:
+   `useAtriumStore(s => s.project)` + early return null).
+3. Updated the edge cases table to reflect both the `ConsultationRegion` null-return guard and
+   the `useConsultationTerminal` projectRoot guard as the two layers of no-project protection.

@@ -75,11 +75,13 @@ export class TerminalManager {
     this.#id = id;
 
     pty.onData((buf: string) => {
+      if (this.#id !== id) return;
       if (this.#window === null || this.#window.isDestroyed()) return;
       this.#window.webContents.send(IPC.terminal.onData, id, toArrayBuffer(buf));
     });
 
     pty.onExit(({ exitCode }: { exitCode: number | undefined }) => {
+      if (this.#id !== id) return;
       if (this.#killTimer !== null) {
         clearTimeout(this.#killTimer);
         this.#killTimer = null;
@@ -159,6 +161,21 @@ export class TerminalManager {
     this.#id = null;
     this.#transition('idle');
     return ok(undefined);
+  }
+
+  /** Reset to idle immediately, silencing stale pty callbacks. Safe to call in any state. */
+  shutdownForReuse(): void {
+    if (this.#killTimer !== null) {
+      clearTimeout(this.#killTimer);
+      this.#killTimer = null;
+    }
+    const pty = this.#pty;
+    this.#id = null; // nulled before kill so old onData/onExit callbacks return early
+    this.#pty = null;
+    this.#state = 'idle';
+    if (pty !== null) {
+      try { pty.kill(); } catch { /* defensive disposal */ }
+    }
   }
 
   setWindow(win: BrowserWindow | null): void {

@@ -60,7 +60,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('registerSkillHandlers — happy path', () => {
-  it('explore: spawns with correct 2-element args and cwd', async () => {
+  it('explore: spawns with --model opus prefix and slash command', async () => {
     const terminalId = 't_abc123' as TerminalId;
     fakeTerminalManager.spawn.mockReturnValue({ ok: true, data: terminalId });
 
@@ -71,12 +71,12 @@ describe('registerSkillHandlers — happy path', () => {
     const [calledArgs, calledCwd] = fakeTerminalManager.spawn.mock.calls[0] as [string[], string];
 
     expect(calledCwd).toBe('/p');
-    expect(calledArgs).toEqual(['claude', '/architector:explore canvas-ui']);
+    expect(calledArgs).toEqual(['claude', '--model', 'opus', '/architector:explore canvas-ui']);
     expect(result.ok).toBe(true);
     expect(result.data).toBe(terminalId);
   });
 
-  it('init without prompt: 2-element args with no prompt in command', async () => {
+  it('init without prompt: slash command is /architector:new', async () => {
     const terminalId = 't_init1' as TerminalId;
     fakeTerminalManager.spawn.mockReturnValue({ ok: true, data: terminalId });
 
@@ -84,7 +84,7 @@ describe('registerSkillHandlers — happy path', () => {
     await invoke(req);
 
     const [calledArgs] = fakeTerminalManager.spawn.mock.calls[0] as [string[], string];
-    expect(calledArgs).toEqual(['claude', '/architector:init']);
+    expect(calledArgs).toEqual(['claude', '--model', 'opus', '/architector:new']);
   });
 
   it('init with prompt: prompt is embedded in the slash command', async () => {
@@ -95,7 +95,7 @@ describe('registerSkillHandlers — happy path', () => {
     await invoke(req);
 
     const [calledArgs] = fakeTerminalManager.spawn.mock.calls[0] as [string[], string];
-    expect(calledArgs).toEqual(['claude', '/architector:init my cool project']);
+    expect(calledArgs).toEqual(['claude', '--model', 'opus', '/architector:new my cool project']);
   });
 });
 

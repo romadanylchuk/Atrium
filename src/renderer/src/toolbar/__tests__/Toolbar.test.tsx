@@ -38,16 +38,13 @@ const fakeProject: ProjectState = {
 };
 
 const spawnMock = vi.fn();
-const runDetachedMock = vi.fn();
 
 beforeEach(() => {
   spawnMock.mockReset();
   spawnMock.mockResolvedValue({ ok: true, data: 'term-1' });
-  runDetachedMock.mockReset();
-  runDetachedMock.mockResolvedValue({ ok: true, data: { exitCode: 0, stdout: '' } });
 
   vi.stubGlobal('atrium', {
-    skill: { spawn: spawnMock, runDetached: runDetachedMock },
+    skill: { spawn: spawnMock },
     project: { getRecents: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
   });
 
@@ -58,8 +55,6 @@ beforeEach(() => {
     toolbarOverlay: null,
     claudeStatus: 'checking',
     claudeInfo: null,
-    detachedRuns: { audit: { kind: 'idle' }, status: { kind: 'idle' } },
-    lastDetachedError: null,
   });
 });
 
@@ -129,45 +124,15 @@ describe('Toolbar', () => {
     });
   });
 
-  it('Audit click calls runDetached with skill=audit', async () => {
+  it('Audit click dispatches skill:spawn with skill=audit', async () => {
     render(<Toolbar />);
     fireEvent.click(screen.getByTestId('toolbar-btn-audit'));
-    await waitFor(() => expect(runDetachedMock).toHaveBeenCalledOnce());
-    expect(runDetachedMock).toHaveBeenCalledWith({ skill: 'audit', cwd: '/my-project' });
-  });
-
-  it('Audit button is enabled when terminal is active', () => {
-    useAtriumStore.setState({ terminal: { id: 'term-1' as ReturnType<typeof useAtriumStore.getState>['terminal']['id'], status: 'active', fullscreen: false } });
-    render(<Toolbar />);
-    expect(screen.getByTestId('toolbar-btn-audit').getAttribute('disabled')).toBeNull();
-  });
-
-  it('Audit button shows Waiting… and is disabled when detachedRuns.audit.kind is waiting', () => {
-    useAtriumStore.setState({
-      detachedRuns: { audit: { kind: 'waiting', startedAt: 0 }, status: { kind: 'idle' } },
+    await waitFor(() => expect(spawnMock).toHaveBeenCalledOnce());
+    expect(spawnMock).toHaveBeenCalledWith<[SkillSpawnRequest]>({
+      skill: 'audit',
+      nodes: [],
+      cwd: '/my-project',
     });
-    render(<Toolbar />);
-    const auditBtn = screen.getByTestId('toolbar-btn-audit');
-    expect(auditBtn.textContent).toBe('Waiting…');
-    expect(auditBtn.getAttribute('disabled')).not.toBeNull();
-  });
-
-  it('lastDetachedError in store renders message in toolbar-error', () => {
-    useAtriumStore.setState({ lastDetachedError: { skill: 'audit', message: 'audit pipeline failed' } });
-    render(<Toolbar />);
-    expect(screen.getByTestId('toolbar-error').textContent).toContain('audit pipeline failed');
-  });
-
-  it('clicking Audit while error is showing dispatches a fresh run', async () => {
-    useAtriumStore.setState({
-      detachedRuns: { audit: { kind: 'error', message: 'prior error', finishedAt: 0 }, status: { kind: 'idle' } },
-      lastDetachedError: { skill: 'audit', message: 'prior error' },
-    });
-    render(<Toolbar />);
-    expect(screen.getByTestId('toolbar-error').textContent).toContain('prior error');
-    fireEvent.click(screen.getByTestId('toolbar-btn-audit'));
-    await waitFor(() => expect(runDetachedMock).toHaveBeenCalledOnce());
-    expect(runDetachedMock).toHaveBeenCalledWith({ skill: 'audit', cwd: '/my-project' });
   });
 
   it('Explore click dispatches skill:spawn with skill=explore and no nodes when nothing selected', async () => {
@@ -223,7 +188,7 @@ describe('Toolbar', () => {
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  it('Free/New/Triage/Explore/Decide/Map/Finalize disabled when terminal active; Audit/Status remain enabled', () => {
+  it('Free/New/Triage/Explore/Decide/Map/Audit/Finalize disabled when terminal active; Status remains enabled', () => {
     useAtriumStore.setState({ terminal: { id: 'term-1' as ReturnType<typeof useAtriumStore.getState>['terminal']['id'], status: 'active', fullscreen: false } });
     render(<Toolbar />);
     expect(screen.getByTestId('toolbar-btn-free').getAttribute('disabled')).not.toBeNull();
@@ -232,7 +197,7 @@ describe('Toolbar', () => {
     expect(screen.getByTestId('toolbar-btn-explore').getAttribute('disabled')).not.toBeNull();
     expect(screen.getByTestId('toolbar-btn-decide').getAttribute('disabled')).not.toBeNull();
     expect(screen.getByTestId('toolbar-btn-map').getAttribute('disabled')).not.toBeNull();
-    expect(screen.getByTestId('toolbar-btn-audit').getAttribute('disabled')).toBeNull();
+    expect(screen.getByTestId('toolbar-btn-audit').getAttribute('disabled')).not.toBeNull();
     expect(screen.getByTestId('toolbar-btn-finalize').getAttribute('disabled')).not.toBeNull();
     expect(screen.getByTestId('toolbar-btn-status').getAttribute('disabled')).toBeNull();
   });

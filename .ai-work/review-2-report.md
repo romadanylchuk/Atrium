@@ -1,31 +1,21 @@
 # Review Report: Phase 2
-_Date: 2026-04-26_
+_Date: 2026-04-28_
 
 ## Status: HAS_ISSUES
 
 ## Must Fix
-
 _(none)_
 
 ## Should Fix
 
-- **[src/main/ipc/skill.ts:51]** `skill:runDetached` handler is declared `async` but contains no `await`. The `skill:spawn` handler directly above it carries `// eslint-disable-next-line @typescript-eslint/require-await` for exactly this reason; the new handler was added without it.
-  → Either add the same disable comment on the line before `async (_event, rawReq) =>`, or change the final line to `return await runDetached(req)` (preferred — also ensures the error-catching wrapper in `safeHandle` can catch any synchronous throw from `runDetached` during the async turn).
-
-- **[src/main/ipc/__tests__/wiredHandlers.test.ts:495]** `mockRunDetached.mockClear()` is called inside the test body rather than in a `beforeEach`, making this test order-sensitive. If the `skill:runDetached` success test is ever skipped or reordered, the call-count assertion in the "unknown skill" test will be wrong.
-  → Add a `beforeEach(() => { vi.mocked(runDetached).mockClear(); })` inside the `describe('skill wired handlers', ...)` block, and remove the manual `.mockClear()` call at line 495. This matches how `vi.clearAllMocks()` is used in the `health wired handlers` describe block.
+- **`src/shared/skill/__tests__/composeCommand.test.ts:127`** — `describe('composeConsultationCommand')` is nested inside the `describe('composeCommand')` block rather than being a sibling.  
+  → Move the entire `describe('composeConsultationCommand', () => { … })` block (lines 127-172) outside the closing `});` of `describe('composeCommand')`. Test output currently reports them as `composeCommand > composeConsultationCommand > …`, which makes failures ambiguous — it looks like a sub-case of `composeCommand` rather than an independent function's tests.
 
 ## Suggestions
 
-- **[src/main/ipc/skill.ts:12]** `VALID_SKILLS` is now a 110-character line. Worth wrapping to a multiline `new Set<string>([...])` for readability, now that the set has grown to 10 members.
-  → No functional impact, purely for scan-ability when the set grows further.
-
-- **[src/main/skill/runDetached.ts:22-31]** The E2E binary override block (`ATRIUM_E2E_CLAUDE_BIN` check + `NODE_ENV` + `app.isPackaged`) is copy-pasted verbatim from `healthCheck.ts`. Out of scope for this phase, but the two files will drift if the override conditions ever change.
-  → Consider a future refactor to extract this into a `resolveClaudeBinForRun()` helper in `resolveClaudeBin.ts` that encapsulates the override logic; both callers shrink to a single `try/catch` line.
-
-- **[src/main/ipc/__tests__/wiredHandlers.test.ts:476]** The `skill:runDetached` happy-path test only exercises `skill: 'audit'`. Since `DetachedSkillName` has two members, a second parameterised case (or a second it-block) for `skill: 'status'` would confirm both members are accepted.
-  → Low-priority; the type already constrains the input, but a 'status' case makes the test resilient to any future narrowing of `VALID_SKILLS`.
+- **`src/shared/skill/composeCommand.ts:1`** — `composeConsultationCommand` and its import are placed at the top of the file, before the existing `SkillName` type, `NO_SLUG_SKILLS` set, and `composeCommand` function.  
+  → Move the import and the new function to the bottom of the file. In files with a clear primary export, additions that aren't logically coupled to the top-of-file code are easier to scan when appended rather than prepended.
 
 ## Summary
 
-The core implementation is clean and correct: `runDetached.ts` mirrors `healthCheck.ts` faithfully, the invariant tests are solid, and the preload bridge is wired consistently with existing channels. The two should-fix items are a missing lint-disable comment on the IPC handler and a fragile mock-clear in the test — both are quick fixes. No architectural concerns.
+The implementation is correct and complete: the function returns the right 13-element array, all flags are in order, the test covers every required assertion, and the plan's element-count error was caught and correctly fixed. The only real issue is that the new `describe` block was accidentally nested inside `describe('composeCommand')` instead of being a top-level sibling — worth fixing before phase 3 lands more tests in the same file.

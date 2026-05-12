@@ -17,6 +17,7 @@
 
 import { IPC } from '@shared/ipc';
 import { ok } from '@shared/result';
+import { TerminalErrorCode } from '@shared/errors';
 import { safeHandle, type IpcMainLike } from './safeHandle';
 import { ipcMain as defaultIpcMain } from './ipcModule';
 import { TerminalManager } from '@main/terminal';
@@ -30,23 +31,38 @@ export interface IpcMainOnLike {
 // Combined interface for handlers that need both handle and on
 export interface IpcMainFullLike extends IpcMainLike, IpcMainOnLike {}
 
-export function registerTerminalHandlers(manager: TerminalManager, ipcMainLike: IpcMainFullLike = defaultIpcMain): void {
+export function registerTerminalHandlers(
+  manager: TerminalManager,
+  ipcMainLike?: IpcMainFullLike,
+  consultationManager?: TerminalManager,
+): void {
+  const ipc = ipcMainLike ?? defaultIpcMain;
+
   safeHandle(
     IPC.terminal.spawn,
     (_, args, cwd) => Promise.resolve(manager.spawn(args as string[], cwd as string)),
-    ipcMainLike,
+    ipc,
   );
 
   safeHandle(
     IPC.terminal.kill,
-    (_, id) => Promise.resolve(manager.kill(id as TerminalId)),
-    ipcMainLike,
+    (_, id) => {
+      const r = manager.kill(id as TerminalId);
+      if (!r.ok && r.error.code === TerminalErrorCode.INVALID_HANDLE && consultationManager) {
+        return Promise.resolve(consultationManager.kill(id as TerminalId));
+      }
+      return Promise.resolve(r);
+    },
+    ipc,
   );
 
   safeHandle(
     IPC.terminal.close,
     (_, id) => {
-      const result = manager.closeAfterExit(id as TerminalId);
+      let result = manager.closeAfterExit(id as TerminalId);
+      if (!result.ok && result.error.code === TerminalErrorCode.INVALID_HANDLE && consultationManager) {
+        result = consultationManager.closeAfterExit(id as TerminalId);
+      }
       if (!result.ok) {
         console.warn(
           `[atrium:terminal] close ignored: code=${result.error.code} message=${result.error.message}`,
@@ -55,12 +71,16 @@ export function registerTerminalHandlers(manager: TerminalManager, ipcMainLike: 
       }
       return Promise.resolve(result);
     },
-    ipcMainLike,
+    ipc,
   );
 
-  ipcMainLike.on(IPC.terminal.write, (_, id, data) => manager.write(id as TerminalId, data as ArrayBuffer));
+  ipc.on(IPC.terminal.write, (_, id, data) => {
+    manager.write(id as TerminalId, data as ArrayBuffer);
+    consultationManager?.write(id as TerminalId, data as ArrayBuffer);
+  });
 
-  ipcMainLike.on(IPC.terminal.resize, (_, id, cols, rows) =>
-    manager.resize(id as TerminalId, cols as number, rows as number),
-  );
+  ipc.on(IPC.terminal.resize, (_, id, cols, rows) => {
+    manager.resize(id as TerminalId, cols as number, rows as number);
+    consultationManager?.resize(id as TerminalId, cols as number, rows as number);
+  });
 }

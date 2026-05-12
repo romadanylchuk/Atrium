@@ -1,24 +1,24 @@
-# Phase 3 Result: Renderer detached-run slice + dispatch helper
+# Phase 3 Result: IPC Channel + Main-Process Handler
 _Plan: `.ai-work/feature-plan.md`_
-_Date: 2026-04-26_
+_Date: 2026-04-28_
 
 ## Status: VERIFIED
 
 ## What Was Implemented
-
-- `src/renderer/src/store/atriumStore.ts` — added `DetachedSkillName` import; added `DetachedRunState` type, `DetachedSlice` type, and `defaultDetachedRuns()` factory; added `detachedRuns: DetachedSlice` and `lastDetachedError: { skill: DetachedSkillName; message: string } | null` fields to `AtriumStore` type and initial state; implemented five actions: `startDetachedRun` (BUSY guard on `'waiting'`), `setDetachedRunResult` (`waiting → done`), `setDetachedRunError` (`waiting → error`; sets `lastDetachedError`), `closeDetachedResult` (`done → idle`), `clearDetachedRunError` (`error → idle`; clears `lastDetachedError` only when skill matches)
-- `src/renderer/src/store/__tests__/atriumStore.test.ts` — imported `DetachedSkillName`; extended `beforeEach` reset with `detachedRuns` and `lastDetachedError`; added 21 new tests covering: initial state, `startDetachedRun` (idle/done/error → waiting, BUSY on waiting), `setDetachedRunResult`, `setDetachedRunError` (sets `lastDetachedError`), `closeDetachedResult`, `clearDetachedRunError` (clears / preserves `lastDetachedError`), independent concurrent slots
-- `src/renderer/src/skill/dispatchDetachedSkill.ts` (new) — implements the helper per the plan contract: calls `startDetachedRun`, returns `BUSY` without calling IPC if already waiting, calls `window.atrium.skill.runDetached`, dispatches `setDetachedRunResult` or `setDetachedRunError` based on the result
-- `src/renderer/src/skill/__tests__/dispatchDetachedSkill.test.ts` (new) — 5 tests covering: happy path (audit and status), error path (`setDetachedRunError` and `lastDetachedError` set), BUSY dedupe (IPC not called), concurrent different-skill calls (no cross-slot blocking)
+- `src/shared/ipc.ts` — added `spawnTerminal: 'consultation:spawnTerminal'` as const to the `consultation` block (old channels kept as dead-code stubs per plan)
+- `src/main/ipc/consultation.ts` — fully rewritten; exports only `registerConsultationSpawnHandler(terminalManager, ipcMainLike?)` which calls `composeConsultationCommand(cwd)` then `terminalManager.spawn(args, cwd)` and returns the Result directly
+- `src/main/consultation/index.ts` — barrel re-export updated: `registerConsultationHandlers` → `registerConsultationSpawnHandler` (this file was not listed in the plan but imported the old export from `@main/ipc/consultation`, causing a TS error)
+- `src/main/ipc/register.ts` — replaced `registerConsultationHandlers(consultationService)` with `registerConsultationSpawnHandler(terminalManager)`; removed `ConsultationService` import; removed `consultationService` from `managers` type
+- `src/main/index.ts` — removed `ConsultationService` import, instantiation, `setWindow` calls, and removed `consultationService` from `registerIpc` call
+- `src/main/ipc/__tests__/wiredHandlers.test.ts` — replaced old 5-test consultation block with single `consultation:spawnTerminal delegates to terminalManager.spawn` test
+- `src/main/ipc/__tests__/register.test.ts` — removed `fakeConsultationService`; removed `consultationService` from all `registerIpc` calls; added old dead consultation channels to the skip set; updated invoke channels list to use `IPC.consultation.spawnTerminal`
 
 ## Deviations from Plan
-
-None. The `dispatchDetachedSkill` signature and behaviour exactly match the plan contract.
+- `src/main/consultation/index.ts` was not listed in the plan's affected files, but it re-exported `registerConsultationHandlers` from `@main/ipc/consultation`. The TS compiler caught this; the export name was updated to `registerConsultationSpawnHandler`.
+- `src/main/ipc/__tests__/register.test.ts` was not listed in the plan but also needed updates: it passed `consultationService` to `registerIpc` and listed old consultation channels in its invoke channels assertion.
 
 ## Gaps Found (if any)
-
-None.
+None
 
 ## Ready for Phase 4
-
-The detached-run Zustand slice is fully functional and observable. `dispatchDetachedSkill` is ready to be called from Toolbar/StatusPanel in Phase 5. Phase 4 (canvas-region overlay host + popup geometry) can proceed — it depends on the store slice already being in place.
+`IPC.consultation.spawnTerminal` constant exists. `registerConsultationSpawnHandler` is registered in `registerIpc`. `registerIpc` no longer requires `consultationService`. TypeScript compiles clean. All 948 non-dead-code tests pass.

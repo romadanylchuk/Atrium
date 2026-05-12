@@ -2,7 +2,21 @@ import { render, screen, cleanup, act } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { useAtriumStore } from '@renderer/store/atriumStore';
 import type { TerminalId } from '@shared/domain';
+import type { ProjectState } from '@shared/domain';
 import { MainShell } from '../MainShell';
+
+function makeProject(): ProjectState {
+  return {
+    rootPath: '/tmp/proj',
+    projectName: 'test',
+    projectHash: 'abc123',
+    context: { description: '', sections: {} },
+    nodes: [],
+    connections: [],
+    sessions: [],
+    warnings: [],
+  };
+}
 
 vi.mock('@renderer/terminal/TerminalModal', () => ({
   TerminalModal: () => <div data-testid="terminal-modal" />,
@@ -14,6 +28,12 @@ vi.mock('@renderer/toolbar/StatusPanel', () => ({
 
 vi.mock('@renderer/toolbar/FinalizePanel', () => ({
   FinalizePanel: () => <div data-testid="finalize-panel" />,
+}));
+
+vi.mock('@renderer/consultation/ConsultationPanel', () => ({
+  ConsultationPanel: () => (
+    <aside data-region="consultation-panel" style={{ flex: '0 0 400px' }} />
+  ),
 }));
 
 vi.stubGlobal('atrium', {
@@ -30,13 +50,7 @@ vi.stubGlobal('atrium', {
     open: vi.fn(),
   },
   consultation: {
-    loadThread: vi.fn().mockResolvedValue({ ok: true, data: null }),
-    sendMessage: vi.fn(),
-    newSession: vi.fn(),
-    cancel: vi.fn(),
-    onStreamChunk: vi.fn().mockReturnValue(() => {}),
-    onStreamComplete: vi.fn().mockReturnValue(() => {}),
-    onStreamError: vi.fn().mockReturnValue(() => {}),
+    spawnTerminal: vi.fn().mockResolvedValue({ ok: true, data: 't_consult' as TerminalId }),
   },
 });
 
@@ -48,11 +62,6 @@ describe('MainShell', () => {
         consultation: {
           panel: { kind: 'closed' },
           pinState: false,
-          thread: null,
-          pending: null,
-          inFlight: null,
-          lastError: null,
-          selectedModel: 'sonnet',
         },
       });
     });
@@ -78,6 +87,9 @@ describe('MainShell', () => {
   });
 
   it('renders the consultation edge tab when panel is closed', () => {
+    act(() => {
+      useAtriumStore.setState({ project: makeProject() });
+    });
     const { container } = render(<MainShell />);
     const edge = container.querySelector('[data-region="consultation-edge"]');
     expect(edge).toBeTruthy();
@@ -87,14 +99,10 @@ describe('MainShell', () => {
   it('renders the consultation panel when panel is open and uses 400px flex basis', () => {
     act(() => {
       useAtriumStore.setState({
+        project: makeProject(),
         consultation: {
           panel: { kind: 'open-pinned' },
           pinState: true,
-          thread: null,
-          pending: null,
-          inFlight: null,
-          lastError: null,
-          selectedModel: 'sonnet',
         },
       });
     });
@@ -138,6 +146,9 @@ describe('MainShell', () => {
   });
 
   it('consultation region is a sibling positioned after the side-panel aside', () => {
+    act(() => {
+      useAtriumStore.setState({ project: makeProject() });
+    });
     const { container } = render(<MainShell />);
     const aside = container.querySelector('[data-region="side-panel"]');
     const edge = container.querySelector('[data-region="consultation-edge"]');

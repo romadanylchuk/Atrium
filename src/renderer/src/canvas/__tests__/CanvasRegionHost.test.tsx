@@ -1,30 +1,12 @@
 import { render, screen, cleanup, act, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useAtriumStore } from '@renderer/store/atriumStore';
+import { useToastStore } from '@renderer/store/toastStore';
 import type { TerminalId } from '@shared/domain';
 import type { ProjectState } from '@shared/domain';
 
 vi.mock('@renderer/terminal/TerminalModal', () => ({
   TerminalModal: () => <div data-testid="terminal-modal" />,
-}));
-
-vi.mock('@renderer/toolbar/DetachedResultPopup', () => ({
-  DetachedResultPopup: ({
-    testid,
-    output,
-    onClose,
-  }: {
-    testid: string;
-    output: string;
-    onClose: () => void;
-  }) => (
-    <div data-testid={testid}>
-      <span data-testid={`${testid}-output`}>{output}</span>
-      <button data-testid={`${testid}-close`} type="button" onClick={onClose}>
-        Close
-      </button>
-    </div>
-  ),
 }));
 
 vi.mock('@renderer/toolbar/StatusPanel', () => ({
@@ -91,7 +73,6 @@ beforeEach(() => {
       toolbarOverlay: null,
       project: fakeProject,
       selectedNodes: new Set(),
-      detachedRuns: { audit: { kind: 'idle' }, status: { kind: 'idle' } },
     });
   });
 });
@@ -222,6 +203,20 @@ describe('CanvasRegionHost', () => {
     expect(useAtriumStore.getState().toolbarOverlay).toBeNull();
   });
 
+  it('FinalizePanel Continue pushes error toast when spawn fails', async () => {
+    spawnMock.mockResolvedValue({ ok: false, error: { code: 'SPAWN_FAILED', message: 'oops' } });
+    useToastStore.setState({ toasts: [] });
+    act(() => {
+      useAtriumStore.setState({ toolbarOverlay: 'finalize' });
+    });
+    render(<CanvasRegionHost />);
+    fireEvent.click(screen.getByTestId('finalize-panel-continue'));
+    await waitFor(() => {
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts.some((t) => t.message === 'oops' && t.kind === 'error')).toBe(true);
+    });
+  });
+
   it('closing FinalizePanel sets toolbarOverlay to null', () => {
     act(() => {
       useAtriumStore.setState({ toolbarOverlay: 'finalize' });
@@ -246,95 +241,4 @@ describe('CanvasRegionHost', () => {
     expect(modal.closest('[data-region="canvas"]')).toBeTruthy();
   });
 
-  it('renders audit-result-popup with output when audit run is done', () => {
-    act(() => {
-      useAtriumStore.setState({
-        detachedRuns: {
-          audit: { kind: 'done', output: 'hello audit', finishedAt: 0 },
-          status: { kind: 'idle' },
-        },
-      });
-    });
-    render(
-      <div data-region="canvas">
-        <CanvasRegionHost />
-      </div>,
-    );
-    const popup = screen.getByTestId('audit-result-popup');
-    expect(popup).toBeDefined();
-    expect(popup.closest('[data-region="canvas"]')).toBeTruthy();
-    expect(screen.getByTestId('audit-result-popup-output').textContent).toBe('hello audit');
-  });
-
-  it('renders status-result-popup with output when status run is done', () => {
-    act(() => {
-      useAtriumStore.setState({
-        detachedRuns: {
-          audit: { kind: 'idle' },
-          status: { kind: 'done', output: 'hello status', finishedAt: 0 },
-        },
-      });
-    });
-    render(
-      <div data-region="canvas">
-        <CanvasRegionHost />
-      </div>,
-    );
-    const popup = screen.getByTestId('status-result-popup');
-    expect(popup).toBeDefined();
-    expect(popup.closest('[data-region="canvas"]')).toBeTruthy();
-    expect(screen.getByTestId('status-result-popup-output').textContent).toBe('hello status');
-  });
-
-  it('renders both audit and status popups when both runs are done', () => {
-    act(() => {
-      useAtriumStore.setState({
-        detachedRuns: {
-          audit: { kind: 'done', output: 'audit out', finishedAt: 0 },
-          status: { kind: 'done', output: 'status out', finishedAt: 0 },
-        },
-      });
-    });
-    render(<CanvasRegionHost />);
-    expect(screen.getByTestId('audit-result-popup')).toBeDefined();
-    expect(screen.getByTestId('status-result-popup')).toBeDefined();
-  });
-
-  it('closing audit popup transitions audit slice to idle', () => {
-    act(() => {
-      useAtriumStore.setState({
-        detachedRuns: {
-          audit: { kind: 'done', output: 'out', finishedAt: 0 },
-          status: { kind: 'idle' },
-        },
-      });
-    });
-    render(<CanvasRegionHost />);
-    fireEvent.click(screen.getByTestId('audit-result-popup-close'));
-    expect(useAtriumStore.getState().detachedRuns.audit.kind).toBe('idle');
-  });
-
-  it('closing status popup transitions status slice to idle', () => {
-    act(() => {
-      useAtriumStore.setState({
-        detachedRuns: {
-          audit: { kind: 'idle' },
-          status: { kind: 'done', output: 'out', finishedAt: 0 },
-        },
-      });
-    });
-    render(<CanvasRegionHost />);
-    fireEvent.click(screen.getByTestId('status-result-popup-close'));
-    expect(useAtriumStore.getState().detachedRuns.status.kind).toBe('idle');
-  });
-
-  it('does not render audit popup when audit run is idle', () => {
-    render(<CanvasRegionHost />);
-    expect(screen.queryByTestId('audit-result-popup')).toBeNull();
-  });
-
-  it('does not render status popup when status run is idle', () => {
-    render(<CanvasRegionHost />);
-    expect(screen.queryByTestId('status-result-popup')).toBeNull();
-  });
 });

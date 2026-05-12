@@ -2,7 +2,9 @@ import type { JSX } from 'react';
 import type { NodeMaturity } from '@shared/domain';
 import type { ProjectState } from '@shared/domain';
 import { useAtriumStore } from '@renderer/store/atriumStore';
-import { dispatchDetachedSkill } from '@renderer/skill/dispatchDetachedSkill';
+import { useToastStore } from '@renderer/store/toastStore';
+import { canSwitch } from '@renderer/sidePanel/canSwitchSelector';
+import { dispatchSkill } from '@renderer/skill/dispatchSkill';
 
 const MATURITY_ORDER: NodeMaturity[] = ['raw-idea', 'explored', 'decided', 'ready'];
 
@@ -12,7 +14,8 @@ type Props = {
 };
 
 export function StatusPanel({ project, onClose }: Props): JSX.Element {
-  const detachedStatusKind = useAtriumStore((s) => s.detachedRuns.status.kind);
+  const terminalStatus = useAtriumStore((s) => s.terminal.status);
+  const switchAllowed = canSwitch(terminalStatus);
 
   const byMaturity = new Map<string, string[]>();
   for (const n of project.nodes) {
@@ -93,13 +96,15 @@ export function StatusPanel({ project, onClose }: Props): JSX.Element {
           <button
             type="button"
             data-testid="status-panel-more"
-            disabled={detachedStatusKind === 'waiting'}
+            disabled={!switchAllowed}
             onClick={() => {
-              useAtriumStore.getState().clearDetachedRunError('status');
-              void dispatchDetachedSkill({ skill: 'status', cwd: project.rootPath });
+              onClose();
+              void dispatchSkill({ skill: 'status', cwd: project.rootPath }).catch((e) =>
+                useToastStore.getState().pushToast(String(e), 'error'),
+              );
             }}
           >
-            {detachedStatusKind === 'waiting' ? 'Waiting…' : 'More Status'}
+            More Status
           </button>
         </div>
       </div>

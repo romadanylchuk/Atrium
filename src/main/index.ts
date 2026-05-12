@@ -7,7 +7,6 @@ import { getProjectsDir } from '@main/storage';
 import { TerminalManager } from '@main/terminal';
 import { resolveClaudeBin } from '@main/terminal/resolveClaudeBin';
 import { WatcherManager } from '@main/fileSync';
-import { ConsultationService } from '@main/consultation/consultationService';
 import { readAndAssembleProject } from '@main/project';
 import { flushLayoutBuffer } from '@main/ipc/flushLayoutBuffer';
 
@@ -23,8 +22,8 @@ const watcherReparseAdapter = async (dir: string) => {
 };
 
 const terminalManager = new TerminalManager();
+const consultationTerminalManager = new TerminalManager();
 const watcherManager = new WatcherManager({ onReparse: watcherReparseAdapter });
-const consultationService = new ConsultationService();
 
 const IS_DEV = !app.isPackaged;
 
@@ -49,8 +48,8 @@ function createMainWindow(): BrowserWindow {
   });
 
   terminalManager.setWindow(win);
+  consultationTerminalManager.setWindow(win);
   watcherManager.setWindow(win);
-  consultationService.setWindow(win);
 
   win.once('ready-to-show', () => {
     win.show();
@@ -69,8 +68,8 @@ function createMainWindow(): BrowserWindow {
   mainWindow = win;
   win.on('closed', () => {
     terminalManager.setWindow(null);
+    consultationTerminalManager.setWindow(null);
     watcherManager.setWindow(null);
-    consultationService.setWindow(null);
     void watcherManager.stop(); // fire-and-forget — unsubscribe at quit, no need to await
     mainWindow = null;
   });
@@ -91,7 +90,7 @@ if (!gotLock) {
 
   // Register IPC handlers before app.whenReady() so that handlers are in place
   // before the renderer's loadURL can dispatch its first IPC call.
-  registerIpc(() => mainWindow, { terminalManager, watcherManager, consultationService });
+  registerIpc(() => mainWindow, { terminalManager, consultationTerminalManager, watcherManager });
 
   void app.whenReady().then(async () => {
     // Ensure the projects directory exists before any layout.ts call races it.

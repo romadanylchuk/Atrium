@@ -115,7 +115,6 @@ export const SkillErrorCode = {
   COMPOSE_FAILED: 'COMPOSE_FAILED',
   SPAWN_FAILED: 'SPAWN_FAILED',
   INVALID_SKILL: 'INVALID_SKILL',
-  RUN_FAILED: 'RUN_FAILED',
 } as const;
 
 export type SkillErrorCode = (typeof SkillErrorCode)[keyof typeof SkillErrorCode];

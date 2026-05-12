@@ -144,6 +144,15 @@ test('AtriumAPI.layout.saveSnapshot is void', () => {
 });
 
 // ---------------------------------------------------------------------------
+// consultation namespace
+// ---------------------------------------------------------------------------
+
+test('AtriumAPI.consultation.spawnTerminal returns Promise<Result<TerminalId, TerminalErrorCode>>', () => {
+  expectTypeOf<AtriumAPI['consultation']['spawnTerminal']>()
+    .returns.resolves.toEqualTypeOf<Result<TerminalId, TerminalErrorCode>>();
+});
+
+// ---------------------------------------------------------------------------
 // skill namespace
 // ---------------------------------------------------------------------------
 

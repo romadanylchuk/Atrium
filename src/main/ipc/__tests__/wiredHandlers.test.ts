@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { registerTerminalHandlers } from '../terminal';
 import { registerFileSyncHandlers } from '../fileSync';
 import { registerHealthHandlers } from '../health';
-import { registerConsultationHandlers } from '../consultation';
+import { registerConsultationSpawnHandler } from '../consultation';
 import { registerSkillHandlers } from '../skill';
 import { IPC } from '@shared/ipc';
 import { ok, err } from '@shared/result';
@@ -49,10 +49,6 @@ vi.mock('@main/terminal/pluginCheck', () => ({
 vi.mock('@main/terminal/pluginInstall', () => ({
   installArchitectorPlugin: vi.fn(),
   getActiveInstallHandle: vi.fn(),
-}));
-
-vi.mock('@main/skill/runDetached', () => ({
-  runDetached: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -353,87 +349,25 @@ describe('health wired handlers', () => {
 // ---------------------------------------------------------------------------
 
 describe('consultation wired handlers', () => {
-  it('consultation:loadThread dispatches to service.loadThread', async () => {
-    const loadResult = ok(null);
-    const service = {
-      loadThread: vi.fn().mockResolvedValue(loadResult),
-      sendMessage: vi.fn(),
-      newSession: vi.fn(),
-      cancel: vi.fn(),
+  it('consultation:spawnTerminal delegates to terminalManager.spawn', async () => {
+    const spawnResult = ok('t_abc' as TerminalId);
+    const manager = {
+      spawn: vi.fn().mockReturnValue(spawnResult),
+      kill: vi.fn(),
+      closeAfterExit: vi.fn(),
+      write: vi.fn(),
+      resize: vi.fn(),
+      getState: vi.fn().mockReturnValue('idle'),
+      shutdownForReuse: vi.fn(),
     };
     const fake = makeFullFakeIpcMain();
-    registerConsultationHandlers(service as never, fake);
+    registerConsultationSpawnHandler(manager as never, fake);
 
-    const result = await fake.invokeChannel(IPC.consultation.loadThread, '/tmp/proj');
-    expect(service.loadThread).toHaveBeenCalledOnce();
-    expect(service.loadThread).toHaveBeenCalledWith('/tmp/proj');
-    expect(result).toEqual(loadResult);
-  });
-
-  it('consultation:sendMessage dispatches to service.sendMessage', async () => {
-    const sendResult = ok({ messageId: 'm_abc' });
-    const service = {
-      loadThread: vi.fn(),
-      sendMessage: vi.fn().mockResolvedValue(sendResult),
-      newSession: vi.fn(),
-      cancel: vi.fn(),
-    };
-    const fake = makeFullFakeIpcMain();
-    registerConsultationHandlers(service as never, fake);
-
-    const result = await fake.invokeChannel(IPC.consultation.sendMessage, '/tmp/proj', 'hello');
-    expect(service.sendMessage).toHaveBeenCalledOnce();
-    expect(service.sendMessage).toHaveBeenCalledWith('/tmp/proj', 'hello');
-    expect(result).toEqual(sendResult);
-  });
-
-  it('consultation:newSession dispatches to service.newSession', async () => {
-    const newSessionResult = ok({ sessionId: 's_abc', systemPromptVersion: 1 });
-    const service = {
-      loadThread: vi.fn(),
-      sendMessage: vi.fn(),
-      newSession: vi.fn().mockResolvedValue(newSessionResult),
-      cancel: vi.fn(),
-    };
-    const fake = makeFullFakeIpcMain();
-    registerConsultationHandlers(service as never, fake);
-
-    const result = await fake.invokeChannel(IPC.consultation.newSession, '/tmp/proj', 'sonnet');
-    expect(service.newSession).toHaveBeenCalledOnce();
-    expect(service.newSession).toHaveBeenCalledWith('/tmp/proj', 'sonnet');
-    expect(result).toEqual(newSessionResult);
-  });
-
-  it('consultation:cancel dispatches to service.cancel', async () => {
-    const cancelResult = ok(undefined);
-    const service = {
-      loadThread: vi.fn(),
-      sendMessage: vi.fn(),
-      newSession: vi.fn(),
-      cancel: vi.fn().mockResolvedValue(cancelResult),
-    };
-    const fake = makeFullFakeIpcMain();
-    registerConsultationHandlers(service as never, fake);
-
-    const result = await fake.invokeChannel(IPC.consultation.cancel, '/tmp/proj', 'm_abc');
-    expect(service.cancel).toHaveBeenCalledOnce();
-    expect(service.cancel).toHaveBeenCalledWith('/tmp/proj', 'm_abc');
-    expect(result).toEqual(cancelResult);
-  });
-
-  it('consultation:sendMessage propagates service errors through safeHandle envelope', async () => {
-    const errResult = err('CLAUDE_NOT_FOUND' as const, 'claude binary not resolved');
-    const service = {
-      loadThread: vi.fn(),
-      sendMessage: vi.fn().mockResolvedValue(errResult),
-      newSession: vi.fn(),
-      cancel: vi.fn(),
-    };
-    const fake = makeFullFakeIpcMain();
-    registerConsultationHandlers(service as never, fake);
-
-    const result = await fake.invokeChannel(IPC.consultation.sendMessage, '/tmp/proj', 'hello');
-    expect(result).toEqual(errResult);
+    const result = await fake.invokeChannel(IPC.consultation.spawnTerminal, { cwd: '/tmp/proj' });
+    expect(manager.spawn).toHaveBeenCalledOnce();
+    expect(manager.spawn.mock.calls[0]![0][0]).toBe('claude');
+    expect(manager.spawn.mock.calls[0]![1]).toBe('/tmp/proj');
+    expect(result).toEqual(spawnResult);
   });
 });
 
@@ -448,11 +382,6 @@ describe('skill wired handlers', () => {
     closeAfterExit: vi.fn(),
     write: vi.fn(),
     resize: vi.fn(),
-  });
-
-  beforeEach(async () => {
-    const { runDetached } = await import('@main/skill/runDetached');
-    vi.mocked(runDetached).mockClear();
   });
 
   it.each(['init', 'explore', 'decide', 'map', 'finalize', 'free', 'new', 'triage', 'audit', 'status'] as const)(
@@ -478,32 +407,4 @@ describe('skill wired handlers', () => {
     expect(manager.spawn).not.toHaveBeenCalled();
   });
 
-  it('skill:runDetached is registered and delegates to runDetached on a valid detached skill', async () => {
-    const { runDetached } = await import('@main/skill/runDetached');
-    const mockRunDetached = vi.mocked(runDetached);
-    const detachedResult = ok({ exitCode: 0, stdout: 'audit done' });
-    mockRunDetached.mockResolvedValue(detachedResult as never);
-
-    const manager = makeManager();
-    const fake = makeFullFakeIpcMain();
-    registerSkillHandlers(manager as never, fake);
-
-    const result = await fake.invokeChannel(IPC.skill.runDetached, { skill: 'audit', cwd: '/tmp/proj' });
-    expect(mockRunDetached).toHaveBeenCalledOnce();
-    expect(mockRunDetached).toHaveBeenCalledWith({ skill: 'audit', cwd: '/tmp/proj' });
-    expect(result).toEqual(detachedResult);
-  });
-
-  it('skill:runDetached rejects an unknown skill with INVALID_SKILL', async () => {
-    const { runDetached } = await import('@main/skill/runDetached');
-    const mockRunDetached = vi.mocked(runDetached);
-
-    const manager = makeManager();
-    const fake = makeFullFakeIpcMain();
-    registerSkillHandlers(manager as never, fake);
-
-    const result = await fake.invokeChannel(IPC.skill.runDetached, { skill: 'completely-unknown', cwd: '/tmp/proj' });
-    expect(result).toMatchObject({ ok: false, error: { code: 'INVALID_SKILL' } });
-    expect(mockRunDetached).not.toHaveBeenCalled();
-  });
 });

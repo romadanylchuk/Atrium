@@ -3,7 +3,6 @@ import { useAtriumStore } from '@renderer/store/atriumStore';
 import { useToastStore } from '@renderer/store/toastStore';
 import { canSwitch } from '@renderer/sidePanel/canSwitchSelector';
 import { dispatchSkill } from '@renderer/skill/dispatchSkill';
-import { dispatchDetachedSkill } from '@renderer/skill/dispatchDetachedSkill';
 import type { SkillName } from '@shared/skill/composeCommand';
 
 type TabName = SkillName;
@@ -21,16 +20,11 @@ export function Toolbar(): JSX.Element {
   const projectName = useAtriumStore((s) => s.project?.projectName);
   const toolbarOverlay = useAtriumStore((s) => s.toolbarOverlay);
   const setToolbarOverlay = useAtriumStore((s) => s.setToolbarOverlay);
-  const detachedRunAudit = useAtriumStore((s) => s.detachedRuns.audit);
-  const lastDetachedError = useAtriumStore((s) => s.lastDetachedError);
-  const clearDetachedRunError = useAtriumStore((s) => s.clearDetachedRunError);
   const pushToast = useToastStore((s) => s.pushToast);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabName | null>(null);
 
   const switchAllowed = canSwitch(terminalStatus);
-  const auditWaiting = detachedRunAudit.kind === 'waiting';
-  const effectiveError = error ?? lastDetachedError?.message ?? null;
 
   async function handleSkill(skill: SkillName): Promise<void> {
     if (!project) return;
@@ -42,13 +36,6 @@ export function Toolbar(): JSX.Element {
       setError(r.error.message);
       pushToast(r.error.message, 'error');
     }
-  }
-
-  async function handleAudit(): Promise<void> {
-    if (!project) return;
-    setError(null);
-    clearDetachedRunError('audit');
-    await dispatchDetachedSkill({ skill: 'audit', cwd: project.rootPath });
   }
 
   function tabStyle(name: TabName, disabled: boolean, activeOverride?: boolean): React.CSSProperties {
@@ -168,12 +155,15 @@ export function Toolbar(): JSX.Element {
           <button
             type="button"
             data-testid="toolbar-btn-audit"
-            data-active="false"
-            disabled={auditWaiting}
-            style={tabStyle('audit', auditWaiting, false)}
-            onClick={() => void handleAudit()}
+            data-active={activeTab === 'audit' ? 'true' : 'false'}
+            disabled={!switchAllowed}
+            style={tabStyle('audit', !switchAllowed)}
+            onClick={() => {
+              setActiveTab('audit');
+              void handleSkill('audit');
+            }}
           >
-            {auditWaiting ? 'Waiting…' : 'Audit'}
+            Audit
           </button>
 
           <button
@@ -204,13 +194,13 @@ export function Toolbar(): JSX.Element {
           </button>
         </div>
 
-        {effectiveError && (
+        {error && (
           <p
             role="alert"
             data-testid="toolbar-error"
             style={{ margin: '4px 0 0', color: '#f38ba8', fontSize: 12 }}
           >
-            {effectiveError}
+            {error}
           </p>
         )}
       </div>

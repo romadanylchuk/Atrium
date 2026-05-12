@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useAtriumStore } from '@renderer/store/atriumStore';
 import { StatusPanel } from '../StatusPanel';
 import type { ProjectState } from '@shared/domain';
+import type { SkillSpawnRequest } from '@shared/skill/spawn';
 
 const fakeProject: ProjectState = {
   rootPath: '/proj',
@@ -46,19 +47,18 @@ const fakeProject: ProjectState = {
   warnings: [],
 };
 
-const runDetachedMock = vi.fn();
+const spawnMock = vi.fn();
 
 beforeEach(() => {
-  runDetachedMock.mockReset();
-  runDetachedMock.mockResolvedValue({ ok: true, data: { exitCode: 0, stdout: '' } });
+  spawnMock.mockReset();
+  spawnMock.mockResolvedValue({ ok: true, data: 'term-1' });
 
   vi.stubGlobal('atrium', {
-    skill: { runDetached: runDetachedMock },
+    skill: { spawn: spawnMock },
   });
 
   useAtriumStore.setState({
-    detachedRuns: { audit: { kind: 'idle' }, status: { kind: 'idle' } },
-    lastDetachedError: null,
+    terminal: { id: null, status: 'idle', fullscreen: false },
   });
 });
 
@@ -114,36 +114,31 @@ describe('StatusPanel', () => {
     expect(panel.style.inset).toBe('0px');
   });
 
-  it('More Status button is present', () => {
+  it('More Status button is present with static label', () => {
     render(<StatusPanel project={fakeProject} onClose={() => {}} />);
-    expect(screen.getByTestId('status-panel-more')).toBeDefined();
-    expect(screen.getByTestId('status-panel-more').textContent).toBe('More Status');
+    const btn = screen.getByTestId('status-panel-more');
+    expect(btn).toBeDefined();
+    expect(btn.textContent).toBe('More Status');
   });
 
-  it('More Status click dispatches runDetached with skill=status', async () => {
-    render(<StatusPanel project={fakeProject} onClose={() => {}} />);
+  it('More Status click calls onClose and dispatches skill:spawn with skill=status', async () => {
+    const onClose = vi.fn();
+    render(<StatusPanel project={fakeProject} onClose={onClose} />);
     fireEvent.click(screen.getByTestId('status-panel-more'));
-    await waitFor(() => expect(runDetachedMock).toHaveBeenCalledOnce());
-    expect(runDetachedMock).toHaveBeenCalledWith({ skill: 'status', cwd: '/proj' });
+    expect(onClose).toHaveBeenCalledOnce();
+    await waitFor(() => expect(spawnMock).toHaveBeenCalledOnce());
+    expect(spawnMock).toHaveBeenCalledWith<[SkillSpawnRequest]>({
+      skill: 'status',
+      cwd: '/proj',
+    });
   });
 
-  it('More Status button shows Waiting… and is disabled when detachedRuns.status.kind is waiting', () => {
+  it('More Status button is disabled when terminal is active', () => {
     useAtriumStore.setState({
-      detachedRuns: { audit: { kind: 'idle' }, status: { kind: 'waiting', startedAt: 0 } },
+      terminal: { id: 'term-1' as ReturnType<typeof useAtriumStore.getState>['terminal']['id'], status: 'active', fullscreen: false },
     });
     render(<StatusPanel project={fakeProject} onClose={() => {}} />);
     const btn = screen.getByTestId('status-panel-more');
-    expect(btn.textContent).toBe('Waiting…');
     expect(btn.getAttribute('disabled')).not.toBeNull();
-  });
-
-  it('More Status re-click while error showing clears prior error', () => {
-    useAtriumStore.setState({
-      detachedRuns: { audit: { kind: 'idle' }, status: { kind: 'error', message: 'prior error', finishedAt: 0 } },
-      lastDetachedError: { skill: 'status', message: 'prior error' },
-    });
-    render(<StatusPanel project={fakeProject} onClose={() => {}} />);
-    fireEvent.click(screen.getByTestId('status-panel-more'));
-    expect(useAtriumStore.getState().lastDetachedError).toBeNull();
   });
 });

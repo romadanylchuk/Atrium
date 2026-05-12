@@ -6,7 +6,6 @@ import { dispatchSkill } from '@renderer/skill/dispatchSkill';
 import { TerminalModal } from '@renderer/terminal/TerminalModal';
 import { StatusPanel } from '@renderer/toolbar/StatusPanel';
 import { FinalizePanel } from '@renderer/toolbar/FinalizePanel';
-import { DetachedResultPopup } from '@renderer/toolbar/DetachedResultPopup';
 
 export function CanvasRegionHost(): JSX.Element {
   const terminalStatus = useAtriumStore((s) => s.terminal.status);
@@ -14,8 +13,6 @@ export function CanvasRegionHost(): JSX.Element {
   const setToolbarOverlay = useAtriumStore((s) => s.setToolbarOverlay);
   const project = useAtriumStore((s) => s.project);
   const pushToast = useToastStore((s) => s.pushToast);
-  const detachedRuns = useAtriumStore((s) => s.detachedRuns);
-  const closeDetachedResult = useAtriumStore((s) => s.closeDetachedResult);
 
   const terminalVisible =
     terminalStatus === 'spawning' || terminalStatus === 'active' || terminalStatus === 'exited';
@@ -47,23 +44,6 @@ export function CanvasRegionHost(): JSX.Element {
           canContinue={switchAllowed}
           onContinue={() => void handleFinalizeContinue()}
           onClose={() => setToolbarOverlay(null)}
-        />
-      )}
-      {detachedRuns.audit.kind === 'done' && (
-        <DetachedResultPopup
-          title="Audit"
-          output={detachedRuns.audit.output}
-          onClose={() => closeDetachedResult('audit')}
-          testid="audit-result-popup"
-          zIndex={101}
-        />
-      )}
-      {detachedRuns.status.kind === 'done' && (
-        <DetachedResultPopup
-          title="Status"
-          output={detachedRuns.status.output}
-          onClose={() => closeDetachedResult('status')}
-          testid="status-result-popup"
         />
       )}
     </>

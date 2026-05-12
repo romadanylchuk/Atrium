@@ -1,84 +1,66 @@
-# Final Check: Toolbar additions & canvas-bounded popup geometry
-_Date: 2026-04-26 (re-audit)_
+# Final Check: Replace Consultation Chat with Consultation Terminal
+_Date: 2026-04-28 (re-audit)_
 
 ## Status: DONE
 
 ## Verified
 
-### Toolbar
-- [x] 9-button row in exact order: Free Terminal | New | Triage | Explore | Decide | Map | Audit | Status | Finalize (`src/renderer/src/toolbar/Toolbar.tsx:84-204`)
-- [x] Free Terminal click → `dispatchSkill('free', cwd)`; project-gated; disabled by `!switchAllowed` (`Toolbar.tsx:84-96`)
-- [x] architector:new → `dispatchSkill('new')`; no slugs/prompt; `composeCommand` returns `['claude','/architector:new']` (`composeCommand.ts:26-28`)
-- [x] architector:triage → `dispatchSkill('triage')` with optional selected node slugs (Map shape) (`composeCommand.ts:30-33`)
-- [x] architector:audit → `dispatchDetachedSkill({skill:'audit'})`; NOT gated by `switchAllowed`; label toggles `Audit` ↔ `Waiting…`; runs in parallel (`Toolbar.tsx:168-177`)
-- [x] Audit "Waiting…" text-only label (no spinner) per decision §6
-- [x] Free/New/Triage/Explore/Decide/Map/**Finalize** disabled by `!switchAllowed`; Audit + Status remain clickable (Finalize fix applied at `Toolbar.tsx:196`)
-- [x] `effectiveError = error ?? lastDetachedError?.message` drives `toolbar-error` paragraph (`Toolbar.tsx:33,207-215`)
+### Expected Behavior
 
-### -p IPC infrastructure
-- [x] `IPC.skill.runDetached = 'skill:runDetached'` channel registered (`src/main/ipc/skill.ts:49-59`)
-- [x] `runDetached()` (`src/main/skill/runDetached.ts`) spawns `claude` with `['-p', '/architector:<skill>']` via node-pty
-- [x] Resolves claude binary via `resolveClaudeBin()` with `ATRIUM_E2E_CLAUDE_BIN` override mirroring `healthCheck.ts`
-- [x] ANSI-strip on exit; resolves `Result<DetachedRunResult, SkillErrorCode>`
-- [x] **Invariant verified**: `runDetached.ts` does NOT import `TerminalManager` (only one comment reference, no `import`)
-- [x] `SkillErrorCode.RUN_FAILED` added in `src/shared/errors.ts:118`
-- [x] Preload bridge `window.atrium.skill.runDetached(req)` wired in `src/preload/index.ts:180-182`
+- [x] Panel open → `consultation:spawnTerminal` IPC invoked with `{ cwd: project.rootPath }`
+- [x] Returned terminal ID stored in `consultationTerminal.id` (Zustand slice)
+- [x] xterm.js mounts inside panel, subscribes to `terminal:onData/onExit/onError` keyed on `id`
+- [x] Panel width: `flex: 0 0 400px` — confirmed in ConsultationPanel.tsx:104
+- [x] Header: "Consultation" label only — no ModelSelector, no Pin, no Close
+- [x] Terminal background: `#20202a` (xterm theme override) — confirmed in ConsultationPanel.tsx:38
+- [x] Auto-close timer unchanged — `useAutoCloseTimer` still wired to `panelRef`
+- [x] Panel collapse does NOT kill terminal process — `clearConsultationTerminal` not called on close
+- [x] Panel re-open re-mounts xterm on same terminal ID — no output replay
+- [x] Project switch: `clearConsultationTerminal()` called before `project.switch()` IPC — atriumStore.ts:259
+- [x] Terminal exit → `status='exited'` → Restart button rendered in header
+- [x] Restart button calls `clearConsultationTerminal()` → id=null, status=idle → hook re-triggers new spawn
 
-### Detached-run store slice
-- [x] `detachedRuns: Record<DetachedSkillName, DetachedRunState>` initialised to `{audit:idle, status:idle}` (`atriumStore.ts:185, 293`)
-- [x] `lastDetachedError` cross-component error channel (`atriumStore.ts:186, 294`)
-- [x] `startDetachedRun` returns `err('BUSY')` if already waiting (dedupe) (`atriumStore.ts:490-499`)
-- [x] `setDetachedRunError` writes both slice and `lastDetachedError` (`atriumStore.ts:510-518`)
-- [x] `closeDetachedResult` (done → idle) and `clearDetachedRunError` (error → idle, clears `lastDetachedError` only on matching skill) (`atriumStore.ts:520-532`)
-- [x] Slice independent of `terminal`; does not gate `canSwitch()`
+### CLI Command
 
-### Popup geometry (canvas-bounded)
-- [x] `CanvasRegionHost` rendered inside `data-region="canvas"` wrapper with `position:relative` (`MainShell.tsx:18-25`)
-- [x] `<TerminalModal/>` removed from MainShell root; rendered through CanvasRegionHost
-- [x] TerminalModal overlay: `position:'absolute'`, `inset: fullscreen ? 0 : '8px'` (`TerminalModal.tsx:225-226`)
-- [x] StatusPanel and FinalizePanel overlays: `position:'absolute'; inset:0` (no longer `position:fixed`)
-- [x] DetachedResultPopup overlay: `position:'absolute'; inset:0`
-- [x] Toolbar overlay state migrated from local `useState` to `toolbarOverlay` store slice (decision §5)
-- [x] Tests confirm popups land inside `data-region="canvas"` subtree via `closest('[data-region="canvas"]')`
+- [x] `composeConsultationCommand` returns 13-element argv starting with `'claude'`
+- [x] Flags: `--model opus`, `--permission-mode dontAsk`, `--system-prompt <PROMPT>`, `--add-dir <root>`, `--allowedTools Read Grep Glob`
+- [x] No `-p`, `--output-format`, `--session-id`, `--max-budget-usd`
+- [x] `CONSULTATION_SYSTEM_PROMPT` correctly sourced from `@shared/consultation/systemPrompt`
 
-### More Status button (in StatusPanel)
-- [x] `status-panel-more` testid present, toggles to `Waiting…` when `detachedRuns.status.kind === 'waiting'` (`StatusPanel.tsx:93-103`)
-- [x] Click → clears prior status error, then `dispatchDetachedSkill({skill:'status', cwd: project.rootPath})`
-- [x] Cached node list above remains visible/usable while More Status is in flight
+### Edge Cases
 
-### Detached result popups
-- [x] `DetachedResultPopup` renders `<pre>` with `whiteSpace:'pre-wrap'`, `fontFamily:'monospace'`, `fontSize:12`, `maxHeight:'60vh'`, `maxWidth:560` — plain text only, no markdown
-- [x] Empty stdout still opens popup with Close button
-- [x] Audit popup `zIndex:101` overlays Status panel/popup `zIndex:100` so concurrent runs let user dismiss audit first
-- [x] Independent popups for concurrent Audit + More Status (CanvasRegionHost renders both)
-- [x] Status result popup persists even if user closes the StatusPanel (rendered from `detachedRuns.status.kind === 'done'`, not gated on overlay slice)
+- [x] No project open: `ConsultationRegion` returns `null` when `project === null` — ConsultationRegion.tsx:10
+- [x] Skill terminal active simultaneously: independent IDs, no store conflicts
+- [x] Spawn race: `statusRef.current !== 'idle'` guard prevents double-spawn — useConsultationTerminal.ts:22
+- [x] Panel close mid-spawn: cleanup calls `clearConsultationTerminal()` guarded by `statusRef.current === 'spawning'` — useConsultationTerminal.ts:35-38
+- [x] System prompt as argv element: direct string[] element, no shell escaping needed
 
-### Edge cases
-- [x] Audit/More Status clicked twice quickly → BUSY guard + button disabled
-- [x] Audit + More Status concurrent → independent slice keys, both produce visible popups
-- [x] -p non-zero exit → `RUN_FAILED` with last-line message → `toolbar-error` (not toast)
-- [x] -p spawn failure / claude not on PATH → `RUN_FAILED` with diagnostic message
-- [x] Triage with no selected nodes → `['claude','/architector:triage']` (empty slug)
-- [x] New with project that already has nodes → button stays enabled; skill decides
-- [x] Project not loaded → `handleSkill` and `handleAudit` short-circuit on `!project` (Free Terminal stays project-gated per decision)
-- [x] Window resize → CSS-only (`position:absolute; inset:0` inside flex parent), no JS recompute
-- [x] Free Terminal exit → reuses TerminalModal exited state with Close/Escape
+### Out of Scope — Confirmed Not Accidentally Implemented
 
-### Out of scope (confirmed not implemented)
-- [x] No markdown rendering of -p output
-- [x] No Cancel button for in-flight -p runs
-- [x] No toasts for -p errors (uses `toolbar-error` line)
-- [x] No streaming -p output
-- [x] SidePanel unchanged
-- [x] No Free-Terminal-without-project allowance
-- [x] No outside-click dismissal of -p popups
+- [x] Consultation service files still on disk as dead code (`consultationService.ts`, `claudeInvoker.ts`, `streamParser.ts`, etc.)
+- [x] EdgeTab label unchanged ("Chat") — EdgeTab.tsx:34
+- [x] No session persistence or replay
+- [x] No auto-open on project load (still EdgeTab-gated)
+- [x] No changes to `composeCommand()` for existing skills
 
-### Test suite
-- [x] 509/509 tests pass across feature areas (`src/renderer/src/{toolbar,skill,store,canvas,shell,terminal}`, `src/main/{skill,ipc}`, `src/shared/skill`)
-- [x] Finalize-disabled-when-active test now asserts the toolbar button is disabled (`Toolbar.test.tsx`)
+## IPC/Contract Integrity
 
-## Issues
-None.
+- [x] `AtriumAPI.consultation` preload surface: single `spawnTerminal` method — api.ts:69-71
+- [x] Preload bridge: `ipcRenderer.invoke(IPC.consultation.spawnTerminal, args)` — index.ts:185-187
+- [x] `registerIpc` managers type: no `consultationService` — register.ts:40-44
+- [x] `ConsultationService` removed from `main/index.ts` — no instantiation, no `setWindow` calls
+- [x] Old 4-handler block replaced by single `consultation:spawnTerminal` test in wiredHandlers.test.ts
+
+## Deleted Files (All Confirmed Gone)
+
+- [x] `hooks/useConsultation.ts`
+- [x] `ChatInput.tsx`, `MessageBubble.tsx`, `MessageList.tsx`, `ModelSelector.tsx`, `NewSessionButton.tsx`
+- [x] `__tests__/useConsultation.test.tsx`, `__tests__/ModelSelector.test.tsx`
 
 ## Regressions
-None found.
+
+None within feature scope. 908 tests pass across 75 test files.
+
+**Pre-existing failures (not regressions):** 4 tests in dead-code files `claudeInvoker.test.ts` and `errorMapper.test.ts` reference a missing fixture `.ai-work/phase0/r1-happy.jsonl`. These files are not modified by this feature and were failing before implementation.
+
+**Plan counting error (not a code issue):** Plan stated "11 elements" for `composeConsultationCommand`; correct count is 13. Implementation and test both assert 13 correctly.

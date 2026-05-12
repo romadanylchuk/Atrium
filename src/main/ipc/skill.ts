@@ -6,10 +6,9 @@ import { composeCommand } from '@shared/skill/composeCommand';
 import { err } from '@shared/result';
 import { SkillErrorCode } from '@shared/errors';
 import type { SkillSpawnRequest } from '@shared/skill/spawn';
-import { runDetached } from '@main/skill/runDetached';
-import type { DetachedRunRequest } from '@shared/skill/detached';
+import type { SkillName } from '@shared/skill/composeCommand';
 
-const VALID_SKILLS = new Set<string>(['init', 'explore', 'decide', 'map', 'finalize', 'free', 'new', 'triage', 'audit', 'status']);
+const VALID_SKILLS: ReadonlySet<SkillName> = new Set<SkillName>(['init', 'explore', 'decide', 'map', 'finalize', 'free', 'new', 'triage', 'audit', 'status']);
 
 export function registerSkillHandlers(
   terminalManager: TerminalManager,
@@ -42,18 +41,6 @@ export function registerSkillHandlers(
         return err(SkillErrorCode.SPAWN_FAILED, result.error.message);
       }
       return result;
-    },
-    ipcMainLike,
-  );
-
-  safeHandle(
-    IPC.skill.runDetached,
-    async (_event, rawReq) => {
-      const req = rawReq as DetachedRunRequest;
-      if (!VALID_SKILLS.has(req.skill)) {
-        return err(SkillErrorCode.INVALID_SKILL, `unknown skill: ${req.skill}`);
-      }
-      return await runDetached(req);
     },
     ipcMainLike,
   );

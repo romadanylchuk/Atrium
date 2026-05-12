@@ -46,9 +46,9 @@ export const IPC = {
   },
   skill: {
     spawn: 'skill:spawn',
-    runDetached: 'skill:runDetached',
   },
   consultation: {
+    spawnTerminal: 'consultation:spawnTerminal',
     sendMessage: 'consultation:sendMessage',
     loadThread: 'consultation:loadThread',
     newSession: 'consultation:newSession',

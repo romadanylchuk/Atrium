@@ -16,9 +16,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC } from '@shared/ipc';
 import type { AtriumAPI } from '@preload/api';
-import type { ProjectState, TerminalId, LayoutFileV1, ConsultationErrorCode } from '@shared/index';
+import type { ProjectState, TerminalId, LayoutFileV1 } from '@shared/index';
 import type { SkillSpawnRequest } from '@shared/skill/spawn';
-import type { DetachedRunRequest } from '@shared/skill/detached';
 
 // ---------------------------------------------------------------------------
 // Helper — build an ipcRenderer listener that wraps a user callback.
@@ -177,60 +176,14 @@ const api: AtriumAPI = {
     spawn(req: SkillSpawnRequest) {
       return ipcRenderer.invoke(IPC.skill.spawn, req);
     },
-    runDetached(req: DetachedRunRequest) {
-      return ipcRenderer.invoke(IPC.skill.runDetached, req);
-    },
   },
 
   // -------------------------------------------------------------------------
   // consultation
   // -------------------------------------------------------------------------
   consultation: {
-    loadThread(projectRoot) {
-      return ipcRenderer.invoke(IPC.consultation.loadThread, projectRoot);
-    },
-    sendMessage(projectRoot, message) {
-      return ipcRenderer.invoke(IPC.consultation.sendMessage, projectRoot, message);
-    },
-    newSession(projectRoot, model) {
-      return ipcRenderer.invoke(IPC.consultation.newSession, projectRoot, model);
-    },
-    cancel(projectRoot, messageId) {
-      return ipcRenderer.invoke(IPC.consultation.cancel, projectRoot, messageId);
-    },
-    onStreamChunk(messageId, cb) {
-      const listener = makeListener<[{ projectHash: string; messageId: string; fullText: string }]>(
-        (payload) => {
-          if (payload.messageId === messageId) cb(payload.fullText);
-        },
-      );
-      ipcRenderer.on(IPC.consultation.streamChunk, listener);
-      return () => {
-        ipcRenderer.removeListener(IPC.consultation.streamChunk, listener);
-      };
-    },
-    onStreamComplete(messageId, cb) {
-      const listener = makeListener<[{ projectHash: string; messageId: string; fullContent: string }]>(
-        (payload) => {
-          if (payload.messageId === messageId) cb(payload.fullContent);
-        },
-      );
-      ipcRenderer.on(IPC.consultation.streamComplete, listener);
-      return () => {
-        ipcRenderer.removeListener(IPC.consultation.streamComplete, listener);
-      };
-    },
-    onStreamError(messageId, cb) {
-      const listener = makeListener<[{ projectHash: string; messageId: string; code: ConsultationErrorCode; raw?: string }]>(
-        (payload) => {
-          if (payload.messageId !== messageId) return;
-          cb(payload.raw !== undefined ? { code: payload.code, raw: payload.raw } : { code: payload.code });
-        },
-      );
-      ipcRenderer.on(IPC.consultation.streamError, listener);
-      return () => {
-        ipcRenderer.removeListener(IPC.consultation.streamError, listener);
-      };
+    spawnTerminal(args) {
+      return ipcRenderer.invoke(IPC.consultation.spawnTerminal, args);
     },
   },
 

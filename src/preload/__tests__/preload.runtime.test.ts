@@ -334,6 +334,28 @@ describe('skill namespace — runtime shape', () => {
 });
 
 // ---------------------------------------------------------------------------
+// consultation namespace runtime shape
+// ---------------------------------------------------------------------------
+
+describe('consultation namespace — runtime shape', () => {
+  it('window.atrium.consultation.spawnTerminal invokes IPC.consultation.spawnTerminal once with the args object', async () => {
+    await ensurePreloadImported();
+    mockInvoke.mockClear();
+
+    const consultationApi = capturedApi!['consultation'] as {
+      spawnTerminal: (args: Record<string, unknown>) => Promise<unknown>;
+    };
+    const args = { cwd: '/tmp/proj' };
+    void consultationApi.spawnTerminal(args);
+
+    expect(mockInvoke).toHaveBeenCalledOnce();
+    const calls = mockInvoke.mock.calls as unknown[][];
+    expect(calls[0]![0]).toBe(IPC.consultation.spawnTerminal);
+    expect(calls[0]![1]).toBe(args);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // send vs invoke dispatch
 // ---------------------------------------------------------------------------
 
