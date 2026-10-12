@@ -1,0 +1,3 @@
+{"type":"system","subtype":"init","cwd":"/fake","session_id":"00000000-0000-0000-0000-000000000002","tools":[],"model":"claude-opus-5-5","permissionMode":"default"}
+{"type":"assistant","message":{"id":"msg_02","type":"message","role":"assistant","model":"<synthetic>","content":[{"type":"text","text":"Not logged in · Please run /login"}],"stop_reason":"stop_sequence"},"session_id":"00000000-0000-0000-0000-000000000002","error":"authentication_failed"}
+{"type":"result","subtype":"success","is_error":true,"duration_ms":40,"num_turns":1,"result":"Not logged in · Please run /login","session_id":"00000000-0000-0000-0000-000000000002","total_cost_usd":0}

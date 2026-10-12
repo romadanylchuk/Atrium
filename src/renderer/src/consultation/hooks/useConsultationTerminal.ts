@@ -38,6 +38,5 @@ export function useConsultationTerminal(projectRoot: string | null): void {
     };
   // id in deps (not status) so the effect re-triggers after clearConsultationTerminal() resets
   // id to null (Restart flow) without re-triggering on setSpawning() which only changes status.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, projectRoot, id, setSpawning, setActive, setExited, clearConsultationTerminal]);
 }

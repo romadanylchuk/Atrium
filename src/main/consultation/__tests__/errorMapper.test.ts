@@ -116,7 +116,7 @@ describe('fixture: r1-happy.jsonl', () => {
   it('mapper chain yields NOT_AUTHENTICATED for the auth-failure stream', () => {
     const fixturePath = path.resolve(
       fileURLToPath(new URL('.', import.meta.url)),
-      '../../../../.ai-work/phase0/r1-happy.jsonl',
+      'fixtures/r1-happy.jsonl',
     );
 
     const lines = fs.readFileSync(fixturePath, 'utf-8').split('\n').filter(l => l.trim());

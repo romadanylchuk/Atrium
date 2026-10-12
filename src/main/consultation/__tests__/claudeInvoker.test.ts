@@ -16,7 +16,7 @@ const mockSpawn = vi.mocked(spawn);
 
 const FIXTURE_DIR = path.resolve(
   fileURLToPath(new URL('.', import.meta.url)),
-  '../../../../.ai-work/phase0',
+  'fixtures',
 );
 
 // ---------------------------------------------------------------------------

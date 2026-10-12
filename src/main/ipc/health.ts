@@ -75,9 +75,9 @@ export function registerHealthHandlers(ipcMainLike: IpcMainLike = defaultIpcMain
 
   safeHandle(
     IPC.health.cancelInstall,
-    async () => {
+    () => {
       getActiveInstallHandle()?.cancel();
-      return ok(undefined);
+      return Promise.resolve(ok(undefined));
     },
     ipcMainLike,
   );

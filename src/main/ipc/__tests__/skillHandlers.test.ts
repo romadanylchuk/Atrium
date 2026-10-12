@@ -27,6 +27,8 @@ const fakeIpcMain = {
 
 const fakeTerminalManager = {
   spawn: vi.fn(),
+  getState: vi.fn(() => 'idle'),
+  shutdownForReuse: vi.fn(),
 };
 
 // ---------------------------------------------------------------------------
@@ -52,6 +54,8 @@ function invoke(req: SkillSpawnRequest) {
 beforeEach(() => {
   handleMap.clear();
   fakeTerminalManager.spawn.mockReset();
+  fakeTerminalManager.getState.mockReset().mockReturnValue('idle');
+  fakeTerminalManager.shutdownForReuse.mockReset();
   registerSkillHandlers(fakeTerminalManager as never, fakeIpcMain);
 });
 
@@ -136,5 +140,24 @@ describe('registerSkillHandlers — error paths', () => {
     expect(result.ok).toBe(false);
     expect(result.error.code).toBe(SkillErrorCode.INVALID_SKILL);
     expect(fakeTerminalManager.spawn).not.toHaveBeenCalled();
+  });
+});
+
+describe('registerSkillHandlers — stuck terminal recovery', () => {
+  it('shuts down a non-idle terminal before spawning', async () => {
+    fakeTerminalManager.getState.mockReturnValue('active');
+    fakeTerminalManager.spawn.mockReturnValue({ ok: true, data: 't_x' as TerminalId });
+
+    const result = await invoke({ skill: 'explore', nodes: ['a'], cwd: '/p' }) as { ok: boolean };
+
+    expect(fakeTerminalManager.shutdownForReuse).toHaveBeenCalledOnce();
+    expect(fakeTerminalManager.spawn).toHaveBeenCalledOnce();
+    expect(result.ok).toBe(true);
+  });
+
+  it('does not shut down an idle terminal', async () => {
+    fakeTerminalManager.spawn.mockReturnValue({ ok: true, data: 't_x' as TerminalId });
+    await invoke({ skill: 'explore', nodes: ['a'], cwd: '/p' });
+    expect(fakeTerminalManager.shutdownForReuse).not.toHaveBeenCalled();
   });
 });

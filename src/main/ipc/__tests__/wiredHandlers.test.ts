@@ -388,7 +388,7 @@ describe('consultation wired handlers', () => {
 
     const result = await fake.invokeChannel(IPC.consultation.spawnTerminal, { cwd: '/tmp/proj' });
     expect(manager.spawn).toHaveBeenCalledOnce();
-    expect(manager.spawn.mock.calls[0]![0][0]).toBe('claude');
+    expect((manager.spawn.mock.calls[0]![0] as string[])[0]).toBe('claude');
     expect(manager.spawn.mock.calls[0]![1]).toBe('/tmp/proj');
     expect(result).toEqual(spawnResult);
   });

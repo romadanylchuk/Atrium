@@ -91,7 +91,7 @@ describe('ProjectPanel', () => {
     render(<ProjectPanel />);
     const container = screen.getByTestId('sidebar-health-line');
     const lines = container.querySelectorAll('div');
-    expect(lines[0].textContent).toBe('claude · checking');
+    expect(lines[0]?.textContent).toBe('claude · checking');
   });
 
   it('sidebar health line shows healthy with version', () => {
@@ -100,7 +100,7 @@ describe('ProjectPanel', () => {
     render(<ProjectPanel />);
     const container = screen.getByTestId('sidebar-health-line');
     const lines = container.querySelectorAll('div');
-    expect(lines[0].textContent).toBe('claude v1.2.3 · healthy');
+    expect(lines[0]?.textContent).toBe('claude v1.2.3 · healthy');
   });
 
   it('sidebar health line shows unreachable', () => {
@@ -108,7 +108,7 @@ describe('ProjectPanel', () => {
     render(<ProjectPanel />);
     const container = screen.getByTestId('sidebar-health-line');
     const lines = container.querySelectorAll('div');
-    expect(lines[0].textContent).toBe('claude · unreachable');
+    expect(lines[0]?.textContent).toBe('claude · unreachable');
   });
 
   it('loads recents on mount, filtering out current project', async () => {
@@ -223,7 +223,7 @@ describe('ProjectPanel', () => {
     render(<ProjectPanel />);
     const container = screen.getByTestId('sidebar-health-line');
     const lines = container.querySelectorAll('div');
-    expect(lines[1].textContent).toBe('architector · checking');
+    expect(lines[1]?.textContent).toBe('architector · checking');
   });
 
   it('plugin line shows present with version when pluginInfo is set', () => {
@@ -232,7 +232,7 @@ describe('ProjectPanel', () => {
     render(<ProjectPanel />);
     const container = screen.getByTestId('sidebar-health-line');
     const lines = container.querySelectorAll('div');
-    expect(lines[1].textContent).toBe('architector v1.1.0 · present');
+    expect(lines[1]?.textContent).toBe('architector v1.1.0 · present');
   });
 
   it('plugin line shows missing', () => {
@@ -240,7 +240,7 @@ describe('ProjectPanel', () => {
     render(<ProjectPanel />);
     const container = screen.getByTestId('sidebar-health-line');
     const lines = container.querySelectorAll('div');
-    expect(lines[1].textContent).toBe('architector · missing');
+    expect(lines[1]?.textContent).toBe('architector · missing');
   });
 
   it('plugin line shows list-unavailable', () => {
@@ -248,28 +248,28 @@ describe('ProjectPanel', () => {
     render(<ProjectPanel />);
     const container = screen.getByTestId('sidebar-health-line');
     const lines = container.querySelectorAll('div');
-    expect(lines[1].textContent).toBe('architector · list-unavailable');
+    expect(lines[1]?.textContent).toBe('architector · list-unavailable');
   });
 
   it('plugin line shows unknown', () => {
     useAtriumStore.setState({ pluginStatus: 'unknown', pluginInfo: null });
     render(<ProjectPanel />);
     const lines = screen.getByTestId('sidebar-health-line').querySelectorAll('div');
-    expect(lines[1].textContent).toBe('architector · unknown');
+    expect(lines[1]?.textContent).toBe('architector · unknown');
   });
 
   it('claude line shows healthy without version when claudeInfo is null', () => {
     useAtriumStore.setState({ claudeStatus: 'healthy', claudeInfo: null });
     render(<ProjectPanel />);
     const lines = screen.getByTestId('sidebar-health-line').querySelectorAll('div');
-    expect(lines[0].textContent).toBe('claude · healthy');
+    expect(lines[0]?.textContent).toBe('claude · healthy');
   });
 
   it('plugin line shows present without version when pluginInfo is null', () => {
     useAtriumStore.setState({ pluginStatus: 'present', pluginInfo: null });
     render(<ProjectPanel />);
     const lines = screen.getByTestId('sidebar-health-line').querySelectorAll('div');
-    expect(lines[1].textContent).toBe('architector · present');
+    expect(lines[1]?.textContent).toBe('architector · present');
   });
 
   it('new-project submit calls dispatchInitSpawn with source=panel and sets pendingInit accordingly', async () => {

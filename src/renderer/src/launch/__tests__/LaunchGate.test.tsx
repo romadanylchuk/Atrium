@@ -122,8 +122,8 @@ describe('LaunchGate', () => {
     vi.stubGlobal('atrium', makeAtrium());
     render(<LaunchGate />);
     expect(screen.getByTestId('launch-health-line').textContent).toContain('claude · unreachable');
-    expect(screen.getByText(/Claude CLI not found\./i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /install claude code/i })).toBeInTheDocument();
+    expect(screen.getByText(/Claude CLI not found\./i)).toBeTruthy();
+    expect(screen.getByRole('link', { name: /install claude code/i })).toBeTruthy();
   });
 
   it('Open button is disabled when claudeStatus is unreachable (gate hard-blocks)', () => {
