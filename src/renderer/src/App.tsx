@@ -6,6 +6,7 @@ import { useHealthPoll } from '@renderer/health/useHealthPoll';
 import { LaunchGate } from '@renderer/launch';
 import { MainShell } from '@renderer/shell';
 import { ToastContainer } from '@renderer/shell/ToastContainer';
+import { UpdatePrompt } from '@renderer/update/UpdatePrompt';
 
 export function App(): JSX.Element {
   const project = useAtriumStore((s) => s.project);
@@ -23,6 +24,7 @@ export function App(): JSX.Element {
     <>
       {project === null ? <LaunchGate /> : <MainShell />}
       <ToastContainer />
+      <UpdatePrompt />
     </>
   );
 }

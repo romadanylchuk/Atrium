@@ -5,6 +5,16 @@ import { resetAutoOpenForTests } from '../autoOpen/startAutoOpen';
 import { App } from '../App';
 import type { ProjectState } from '@shared/domain';
 
+// App mounts UpdatePrompt; dev/test builds report idle.
+function makeUpdateStub() {
+  return {
+    getStatus: vi.fn().mockResolvedValue({ ok: true, data: { kind: 'idle' } }),
+    download: vi.fn().mockResolvedValue({ ok: true, data: undefined }),
+    openReleasePage: vi.fn().mockResolvedValue({ ok: true, data: undefined }),
+    onStatus: vi.fn().mockReturnValue(() => {}),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -48,6 +58,7 @@ describe('App', () => {
 
   it('renders LaunchGate when project === null', () => {
     vi.stubGlobal('atrium', {
+      update: makeUpdateStub(),
       project: {
         getRecents: vi.fn().mockResolvedValue({ ok: true, data: [] }),
         open: vi.fn(),
@@ -73,6 +84,7 @@ describe('App', () => {
 
   it('closes gate and shows MainShell when setProject is called', async () => {
     vi.stubGlobal('atrium', {
+      update: makeUpdateStub(),
       project: {
         getRecents: vi.fn().mockResolvedValue({ ok: true, data: [] }),
         open: vi.fn(),
@@ -104,6 +116,7 @@ describe('App', () => {
 
   it('renders MainShell (not gate) when project is pre-set in store', () => {
     vi.stubGlobal('atrium', {
+      update: makeUpdateStub(),
       project: {
         getRecents: vi.fn().mockResolvedValue({ ok: true, data: [] }),
         open: vi.fn(),
@@ -130,6 +143,7 @@ describe('App', () => {
 
   it('renders React Flow container after opening a recent project via auto-open', async () => {
     vi.stubGlobal('atrium', {
+      update: makeUpdateStub(),
       project: {
         getRecents: vi.fn().mockResolvedValue({
           ok: true,
@@ -166,6 +180,7 @@ describe('App', () => {
   it('StrictMode double-mount does not duplicate auto-open (idempotent)', async () => {
     const openMock = vi.fn().mockResolvedValue({ ok: true, data: validProjectStateWithOneNode });
     vi.stubGlobal('atrium', {
+      update: makeUpdateStub(),
       project: {
         getRecents: vi.fn().mockResolvedValue({
           ok: true,

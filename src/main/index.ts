@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { applyFixPath } from '@main/boot';
@@ -9,6 +9,7 @@ import { resolveClaudeBin } from '@main/terminal/resolveClaudeBin';
 import { WatcherManager } from '@main/fileSync';
 import { readAndAssembleProject } from '@main/project';
 import { flushLayoutBuffer } from '@main/ipc/flushLayoutBuffer';
+import { UpdateService, loadElectronUpdater } from '@main/updater/updateService';
 
 applyFixPath();
 void resolveClaudeBin().catch(() => { /* health check will surface a proper error */ });
@@ -28,6 +29,18 @@ const watcherManager = new WatcherManager({ onReparse: watcherReparseAdapter });
 const IS_DEV = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
+
+// Self-update only makes sense for installed builds; dev runs never check.
+const updateService = IS_DEV
+  ? undefined
+  : new UpdateService({
+      getWindow: () => mainWindow,
+      currentVersion: app.getVersion(),
+      platform: process.platform,
+      appImagePath: process.env['APPIMAGE'],
+      loadUpdater: loadElectronUpdater,
+      openExternal: (url) => shell.openExternal(url),
+    });
 
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -90,7 +103,7 @@ if (!gotLock) {
 
   // Register IPC handlers before app.whenReady() so that handlers are in place
   // before the renderer's loadURL can dispatch its first IPC call.
-  registerIpc(() => mainWindow, { terminalManager, consultationTerminalManager, watcherManager });
+  registerIpc(() => mainWindow, { terminalManager, consultationTerminalManager, watcherManager, updateService });
 
   void app.whenReady().then(async () => {
     // Ensure the projects directory exists before any layout.ts call races it.
@@ -102,6 +115,10 @@ if (!gotLock) {
       );
 
     createMainWindow();
+
+    void updateService?.start().catch((err: unknown) =>
+      console.warn('[atrium:update] updater failed to start:', err),
+    );
   });
 
   app.on('window-all-closed', () => {

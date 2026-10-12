@@ -16,7 +16,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC } from '@shared/ipc';
 import type { AtriumAPI } from '@preload/api';
-import type { ProjectState, TerminalId, LayoutFileV1 } from '@shared/index';
+import type { ProjectState, TerminalId, LayoutFileV1, UpdateStatus } from '@shared/index';
 import type { SkillSpawnRequest } from '@shared/skill/spawn';
 
 // ---------------------------------------------------------------------------
@@ -193,6 +193,28 @@ const api: AtriumAPI = {
   shell: {
     openExternal(url) {
       return ipcRenderer.invoke(IPC.shell.openExternal, url);
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // update
+  // -------------------------------------------------------------------------
+  update: {
+    getStatus() {
+      return ipcRenderer.invoke(IPC.update.getStatus);
+    },
+    download() {
+      return ipcRenderer.invoke(IPC.update.download);
+    },
+    openReleasePage() {
+      return ipcRenderer.invoke(IPC.update.openReleasePage);
+    },
+    onStatus(cb) {
+      const listener = makeListener<[UpdateStatus]>(cb);
+      ipcRenderer.on(IPC.update.onStatus, listener);
+      return () => {
+        ipcRenderer.removeListener(IPC.update.onStatus, listener);
+      };
     },
   },
 };

@@ -25,6 +25,8 @@ import type {
   LayoutFileV1,
   LayoutErrorCode,
   SkillErrorCode,
+  CommonErrorCode,
+  UpdateStatus,
 } from '@shared/index';
 import type { SkillSpawnRequest } from '@shared/skill/spawn';
 
@@ -71,6 +73,13 @@ export type AtriumAPI = {
   };
   shell: {
     openExternal(url: string): Promise<void>;
+  };
+  update: {
+    getStatus(): Promise<Result<UpdateStatus, CommonErrorCode>>;
+    /** Downloads and installs (restarting the app); opens the release page where self-update is unsupported. */
+    download(): Promise<Result<void, CommonErrorCode>>;
+    openReleasePage(): Promise<Result<void, CommonErrorCode>>;
+    onStatus(cb: (status: UpdateStatus) => void): () => void;
   };
 };
 

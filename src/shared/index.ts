@@ -13,3 +13,4 @@ export * from './ipc.js';
 export * from './layout.js';
 export * from './skill/spawn.js';
 export * from './consultation.js';
+export * from './update.js';

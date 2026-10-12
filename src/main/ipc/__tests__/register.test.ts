@@ -65,6 +65,7 @@ const PUSH_ONLY_CHANNELS = new Set<string>([
   IPC.consultation.streamChunk,
   IPC.consultation.streamComplete,
   IPC.consultation.streamError,
+  IPC.update.onStatus,
 ]);
 
 // Dead consultation channels kept in IPC constants for downstream compat but never registered:

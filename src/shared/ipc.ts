@@ -60,4 +60,10 @@ export const IPC = {
   shell: {
     openExternal: 'shell:openExternal',
   },
+  update: {
+    getStatus: 'update:getStatus',
+    download: 'update:download',
+    openReleasePage: 'update:openReleasePage',
+    onStatus: 'update:onStatus',
+  },
 } as const;

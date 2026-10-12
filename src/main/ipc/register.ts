@@ -19,6 +19,8 @@ import { registerLayoutHandlers } from './layout';
 import { registerSkillHandlers } from './skill';
 import { registerConsultationSpawnHandler } from './consultation';
 import { registerShellHandlers } from './shell';
+import { registerUpdateHandlers } from './update';
+import type { UpdateService } from '@main/updater/updateService';
 import { TerminalManager } from '@main/terminal';
 import { WatcherManager } from '@main/fileSync';
 
@@ -42,6 +44,8 @@ export function registerIpc(
     terminalManager: TerminalManager;
     consultationTerminalManager: TerminalManager;
     watcherManager: WatcherManager;
+    /** Present only in packaged builds. */
+    updateService?: UpdateService;
   },
 ): void {
   if (registered) return;
@@ -58,4 +62,5 @@ export function registerIpc(
   registerSkillHandlers(terminalManager);
   registerConsultationSpawnHandler(consultationTerminalManager);
   registerShellHandlers();
+  registerUpdateHandlers(managers.updateService);
 }

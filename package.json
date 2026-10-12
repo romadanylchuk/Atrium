@@ -42,6 +42,7 @@
     "@parcel/watcher": "2.5.6",
     "@types/dagre": "^0.7.54",
     "dagre": "^0.8.5",
+    "electron-updater": "6.8.10",
     "fix-path": "5.0.0",
     "lodash.debounce": "^4.0.8",
     "node-pty": "1.1.0",
