@@ -25,7 +25,8 @@ import { CanvasEmptyState } from './CanvasEmptyState';
 import { CanvasErrorState } from './CanvasErrorState';
 import { Legend } from './Legend';
 import { CanvasControls, FIT_PADDING } from './CanvasControls';
-import { computeHighlight, DIMMED_NODE_STYLE, DIMMED_EDGE_COLOR } from './legendHighlight';
+import { NodeSearch } from './NodeSearch';
+import { computeHighlight, DIMMED_NODE_STYLE, DIMMED_EDGE_COLOR, FOCUSED_NODE_STYLE } from './legendHighlight';
 import type { AtriumEdgeData } from './AtriumEdge';
 
 const nodeTypes = { atriumNode: AtriumNode };
@@ -139,22 +140,54 @@ function CanvasInner() {
     return fit === null ? DEFAULT_MIN_ZOOM : Math.min(DEFAULT_MIN_ZOOM, fit);
   }, [nodes, containerSize]);
 
-  // After a manual re-layout, frame the new arrangement once React Flow has applied it.
-  // The relayout id bumps one render before useProjectSync's new positions land, so mark
-  // the request pending and fit on the following nodes update.
+  // Auto-fit: keep the whole graph framed until the user takes over the camera (pans, zooms,
+  // drags a node or jumps to a node via search). While active, the view refits whenever the
+  // canvas resizes (side panels settle after a project loads) or positions are replaced
+  // wholesale (saved layout arrives async, manual re-layout). Re-armed by project open/relayout.
+  const autoFitRef = useRef(true);
+  const stopAutoFit = useCallback(() => {
+    autoFitRef.current = false;
+  }, []);
+
+  // Position replacements arrive a render before useProjectSync applies them, so remember the
+  // nodes array current at request time and fit on the first different one.
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+  const fitAfterRef = useRef<Node[] | null>(null);
   const handledRelayoutRef = useRef(relayoutRequestId);
-  const fitPendingRef = useRef(false);
   useEffect(() => {
     if (relayoutRequestId !== handledRelayoutRef.current) {
       handledRelayoutRef.current = relayoutRequestId;
-      fitPendingRef.current = true;
-      return;
+      autoFitRef.current = true;
+      fitAfterRef.current = nodesRef.current;
     }
-    if (!fitPendingRef.current) return;
-    fitPendingRef.current = false;
-    const raf = requestAnimationFrame(() => rf.fitView({ ...FIT_VIEW_OPTIONS, duration: 300 }));
+  }, [relayoutRequestId]);
+  useEffect(() => {
+    autoFitRef.current = true;
+  }, [project?.projectHash]);
+  useEffect(() => {
+    fitAfterRef.current = nodesRef.current;
+  }, [seedPositions]);
+
+  const lastFitSizeRef = useRef(containerSize);
+  useEffect(() => {
+    if (!autoFitRef.current || nodes.length === 0) return;
+    if (containerSize.width === 0 || containerSize.height === 0) return;
+    const positionsReplaced = fitAfterRef.current !== null && fitAfterRef.current !== nodes;
+    const resized = lastFitSizeRef.current !== containerSize;
+    if (!positionsReplaced && !resized) return;
+    // Measured sizes live in React Flow's internal nodes, not in our state copies.
+    if (!rf.getNodes().every((n) => n.width && n.height)) return;
+    // A newer request may land before this frame (saved layout arriving); only clear the
+    // request this fit was scheduled for so the newer one still gets its fit.
+    const request = fitAfterRef.current;
+    const raf = requestAnimationFrame(() => {
+      if (fitAfterRef.current === request) fitAfterRef.current = null;
+      lastFitSizeRef.current = containerSize;
+      rf.fitView(FIT_VIEW_OPTIONS);
+    });
     return () => cancelAnimationFrame(raf);
-  }, [relayoutRequestId, nodes, rf]);
+  }, [nodes, containerSize, rf]);
 
   // Legend highlight: grey out nodes/edges that don't match the picked legend row.
   const highlight = useMemo(
@@ -169,15 +202,22 @@ function CanvasInner() {
 
   const displayNodes = useMemo(() => {
     if (!highlight) return nodes;
+    const focusedSlug = legendHighlight?.kind === 'node' ? legendHighlight.value : null;
     return nodes.map((n) => {
       const lit = highlight.litNodes.has(n.id);
+      const focused = n.id === focusedSlug;
       return {
         ...n,
-        style: { ...n.style, ...(lit ? {} : DIMMED_NODE_STYLE), transition: 'opacity 150ms, filter 150ms' },
-        zIndex: lit ? 1 : 0,
+        style: {
+          ...n.style,
+          ...(lit ? {} : DIMMED_NODE_STYLE),
+          ...(focused ? FOCUSED_NODE_STYLE : {}),
+          transition: 'opacity 150ms, filter 150ms',
+        },
+        zIndex: focused ? 2 : lit ? 1 : 0,
       };
     });
-  }, [nodes, highlight]);
+  }, [nodes, highlight, legendHighlight]);
 
   const displayEdges = useMemo(() => {
     if (!highlight) return edges;
@@ -219,6 +259,11 @@ function CanvasInner() {
         minZoom={minZoom}
         onNodesChange={handleNodesChange}
         onMoveEnd={handleViewportChange}
+        // Programmatic moves (fitView, setCenter) have no source event.
+        onMoveStart={(event) => {
+          if (event) stopAutoFit();
+        }}
+        onNodeDragStart={stopAutoFit}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
@@ -234,7 +279,8 @@ function CanvasInner() {
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#1f1f26" />
       </ReactFlow>
-      <CanvasControls />
+      <CanvasControls onUserZoom={stopAutoFit} />
+      <NodeSearch onNavigate={stopAutoFit} />
       <Legend />
       {canvas.kind === 'empty' && <CanvasEmptyState />}
       {canvas.kind === 'error' && <CanvasErrorState message={canvas.message} />}

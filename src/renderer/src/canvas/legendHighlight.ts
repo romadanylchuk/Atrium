@@ -4,6 +4,7 @@ import type { LegendHighlight } from '../store/atriumStore';
  * Decides which nodes/edges stay lit for a legend highlight.
  * - maturity: nodes with that maturity; edges whose both ends have it.
  * - connection: edges of that type; nodes touching at least one of them.
+ * - node: that node, its connections and its direct neighbours.
  * Returns null when nothing is highlighted (everything rendered normally).
  */
 export function computeHighlight(
@@ -23,6 +24,14 @@ export function computeHighlight(
     for (const c of connections) {
       if (litNodes.has(c.from) && litNodes.has(c.to)) litEdges.add(c.id);
     }
+  } else if (highlight.kind === 'node') {
+    litNodes.add(highlight.value);
+    for (const c of connections) {
+      if (c.from !== highlight.value && c.to !== highlight.value) continue;
+      litEdges.add(c.id);
+      litNodes.add(c.from);
+      litNodes.add(c.to);
+    }
   } else {
     for (const c of connections) {
       if (c.type !== highlight.value) continue;
@@ -36,3 +45,5 @@ export function computeHighlight(
 
 export const DIMMED_NODE_STYLE = { opacity: 0.2, filter: 'grayscale(1)' } as const;
 export const DIMMED_EDGE_COLOR = '#3a3a42';
+/** Ring around the node picked in the search box, so it stands out from its lit neighbours. */
+export const FOCUSED_NODE_STYLE = { outline: '2px solid #e6e6e6', outlineOffset: '3px', borderRadius: '6px' } as const;

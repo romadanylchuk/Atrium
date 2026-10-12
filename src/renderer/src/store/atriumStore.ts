@@ -94,7 +94,8 @@ function defaultConsultationTerminalSlice(): ConsultationTerminalSlice {
 // Store shape
 // ---------------------------------------------------------------------------
 
-export type LegendHighlight = { kind: 'maturity' | 'connection'; value: string };
+/** `node` comes from the canvas search box; `value` is the node slug. */
+export type LegendHighlight = { kind: 'maturity' | 'connection' | 'node'; value: string };
 
 type SwitchProjectErrorCode = 'BLOCKED_BY_TERMINAL' | ProjectErrorCode;
 
@@ -181,6 +182,7 @@ export type AtriumStore = {
 
   triggerRelayout: () => void;
   toggleLegendHighlight: (highlight: LegendHighlight) => void;
+  setLegendHighlight: (highlight: LegendHighlight | null) => void;
 
   // --- Consultation panel actions ---
   openConsultationPanel: () => void;
@@ -397,6 +399,10 @@ export const useAtriumStore = create<AtriumStore>((set, get) => ({
       const same = cur !== null && cur.kind === highlight.kind && cur.value === highlight.value;
       return { legendHighlight: same ? null : highlight };
     });
+  },
+
+  setLegendHighlight(highlight) {
+    set({ legendHighlight: highlight });
   },
 
   // -------------------------------------------------------------------------

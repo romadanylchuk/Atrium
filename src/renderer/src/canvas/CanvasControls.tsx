@@ -55,7 +55,7 @@ function RelayoutIcon() {
   );
 }
 
-export function CanvasControls() {
+export function CanvasControls({ onUserZoom }: { onUserZoom?: () => void } = {}) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const triggerRelayout = useAtriumStore((s) => s.triggerRelayout);
 
@@ -80,7 +80,10 @@ export function CanvasControls() {
         data-testid="canvas-ctrl-zoom-in"
         data-canvas-ctrl="true"
         style={BTN_STYLE}
-        onClick={() => zoomIn()}
+        onClick={() => {
+          onUserZoom?.();
+          void zoomIn();
+        }}
         aria-label="Zoom in"
       >
         <ZoomInIcon />
@@ -90,7 +93,10 @@ export function CanvasControls() {
         data-testid="canvas-ctrl-zoom-out"
         data-canvas-ctrl="true"
         style={BTN_STYLE}
-        onClick={() => zoomOut()}
+        onClick={() => {
+          onUserZoom?.();
+          void zoomOut();
+        }}
         aria-label="Zoom out"
       >
         <ZoomOutIcon />

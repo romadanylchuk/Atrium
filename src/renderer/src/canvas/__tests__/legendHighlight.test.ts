@@ -28,3 +28,11 @@ describe('computeHighlight', () => {
     expect([...r.litNodes].sort()).toEqual(['b', 'c']);
   });
 });
+
+describe('computeHighlight — node', () => {
+  it('lights the node, its connections and direct neighbours only', () => {
+    const r = computeHighlight({ kind: 'node', value: 'a' }, nodes, connections)!;
+    expect([...r.litNodes].sort()).toEqual(['a', 'b']);
+    expect([...r.litEdges]).toEqual(['e1']);
+  });
+});
