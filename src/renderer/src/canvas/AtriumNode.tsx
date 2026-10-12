@@ -39,7 +39,7 @@ export function AtriumNode({ data }: NodeProps<AtriumNodeData>) {
 
   return (
     <div style={containerStyle} onClick={handleClick} onContextMenu={handleContextMenu}>
-      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Left} />
       <div
         style={{
           fontSize: '11px',
@@ -65,7 +65,7 @@ export function AtriumNode({ data }: NodeProps<AtriumNodeData>) {
           </span>
         )}
       </div>
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Right} />
     </div>
   );
 }

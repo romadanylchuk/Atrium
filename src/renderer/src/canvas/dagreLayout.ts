@@ -1,9 +1,13 @@
 import dagre from 'dagre';
 import type { NodePosition } from '@shared/layout';
 
-export const DAGRE_RANKDIR = 'TB' as const;
-export const NODESEP = 40;
-export const RANKSEP = 80;
+// Left-to-right: nodes are much wider than tall, so stacking each rank as a column packs
+// large graphs ~2x denser than top-to-bottom rows (fit zoom 0.58 vs 0.27 on a 55-node graph).
+export const DAGRE_RANKDIR = 'LR' as const;
+export const NODESEP = 16;
+export const RANKSEP = 60;
+// tight-tree keeps ranks narrower than network-simplex on wide, densely-connected graphs.
+const RANKER = 'tight-tree';
 
 const DEFAULT_NODE_WIDTH = 96;
 const DEFAULT_NODE_HEIGHT = 36;
@@ -85,7 +89,7 @@ export function computeDagrePositions(
   existingPositions: Map<string, NodePosition>,
 ): Map<string, NodePosition> {
   const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: DAGRE_RANKDIR, nodesep: NODESEP, ranksep: RANKSEP, edgesep: 20 });
+  g.setGraph({ rankdir: DAGRE_RANKDIR, nodesep: NODESEP, ranksep: RANKSEP, edgesep: 10, ranker: RANKER });
   g.setDefaultEdgeLabel(() => ({}));
 
   for (const node of nodes) {
@@ -106,7 +110,7 @@ export function computeDagrePositions(
     let col = 0;
     for (const node of nodes) {
       if (!existingPositions.has(node.slug)) {
-        result.set(node.slug, { x: col * (DEFAULT_NODE_WIDTH + NODESEP), y: 0 });
+        result.set(node.slug, { x: 0, y: col * (DEFAULT_NODE_HEIGHT + NODESEP) });
         col++;
       }
     }

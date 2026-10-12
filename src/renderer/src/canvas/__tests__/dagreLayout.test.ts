@@ -7,12 +7,12 @@ function makeNodes(slugs: string[]) {
 }
 
 describe('dagre constants', () => {
-  it('NODESEP is 40', () => {
-    expect(NODESEP).toBe(40);
+  it('NODESEP is 16', () => {
+    expect(NODESEP).toBe(16);
   });
 
-  it('RANKSEP is 80', () => {
-    expect(RANKSEP).toBe(80);
+  it('RANKSEP is 60', () => {
+    expect(RANKSEP).toBe(60);
   });
 });
 
@@ -107,8 +107,8 @@ describe('selectLayoutEdges', () => {
       ],
       new Map(),
     );
-    expect(pos.get('a')!.y).toBeLessThan(pos.get('b')!.y);
-    expect(pos.get('b')!.y).toBeLessThan(pos.get('c')!.y);
+    expect(pos.get('a')!.x).toBeLessThan(pos.get('b')!.x);
+    expect(pos.get('b')!.x).toBeLessThan(pos.get('c')!.x);
   });
 
   it('survives dependency cycles', () => {
