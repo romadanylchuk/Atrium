@@ -1,66 +1,82 @@
-# Final Check: Replace Consultation Chat with Consultation Terminal
-_Date: 2026-04-28 (re-audit)_
+# Final Check: Sticky Node Layout + Consultation Terminal Clipboard Parity
+_Date: 2026-05-13_
 
 ## Status: DONE
 
-## Verified
+## Verified (against `interview-brief.md`, not the plan)
 
-### Expected Behavior
+### Issue 1 — Sticky positions
 
-- [x] Panel open → `consultation:spawnTerminal` IPC invoked with `{ cwd: project.rootPath }`
-- [x] Returned terminal ID stored in `consultationTerminal.id` (Zustand slice)
-- [x] xterm.js mounts inside panel, subscribes to `terminal:onData/onExit/onError` keyed on `id`
-- [x] Panel width: `flex: 0 0 400px` — confirmed in ConsultationPanel.tsx:104
-- [x] Header: "Consultation" label only — no ModelSelector, no Pin, no Close
-- [x] Terminal background: `#20202a` (xterm theme override) — confirmed in ConsultationPanel.tsx:38
-- [x] Auto-close timer unchanged — `useAutoCloseTimer` still wired to `panelRef`
-- [x] Panel collapse does NOT kill terminal process — `clearConsultationTerminal` not called on close
-- [x] Panel re-open re-mounts xterm on same terminal ID — no output replay
-- [x] Project switch: `clearConsultationTerminal()` called before `project.switch()` IPC — atriumStore.ts:259
-- [x] Terminal exit → `status='exited'` → Restart button rendered in header
-- [x] Restart button calls `clearConsultationTerminal()` → id=null, status=idle → hook re-triggers new spawn
+**Expected Behavior**
+- [x] **First open, no saved layout** — `Canvas.tsx:65-70` calls `window.atrium.layout.load`; empty result sets empty `seedPositions`. In `useProjectSync.ts:120, 146-148` `isFirstSync=true && seedPositions.size===0` ⇒ `useDagreForAdded=true`, so dagre runs for the empty `prevSlugs` against `nextSlugs`. Persistence wired via `Canvas.tsx:99-111` `handleNodesChange → saveNodes`.
+- [x] **Second open, saved layout** — seed loop at `useProjectSync.ts:125-138` overwrites `existingPositions` with disk positions for every known slug; `useDagreForAdded=false`, but every added slug already lives in `existingPositions`, so `addedPositions` stays empty and no viewport-center fallback fires for seeded slugs.
+- [x] **Mid-session re-sync (file edit, architector write, maturity/name/description/connection change)** — `getLiveNodes()` at `useProjectSync.ts:101-108` rebuilds `existingPositions` from React Flow's live store. Existing slugs preserve drag positions; non-slug edits leave `addedSlugs` empty so no repositioning. Confirmed by case H, I in `useProjectSync.test.tsx`.
+- [x] **Brand-new slug mid-session** — `useDagreForAdded` evaluates to `false` (not first sync, not relayout); `getViewportCenter()` returns flow-coord center via `Canvas.tsx:46-51` (`rf.screenToFlowPosition(rect/2)`); multiple new slugs stack at same point. Confirmed by case J, K.
+- [x] **Re-layout button** — `useProjectSync.ts:75-82` bumps `prevRelayoutIdRef`; `existingPositions` left empty by the guarded fill at line 100; dagre runs for entire graph. Confirmed by case L.
+- [x] **Node removed** — `useProjectSync.ts:86-95` strips selection + tooltip; persistence rebuilds map from current node list on next `onNodesChange`.
+- [x] **App restart** — `layout.load` reload path unchanged. No regressions.
 
-### CLI Command
+**Edge Cases**
+- [x] Stale seed slug warning preserved (`useProjectSync.ts:128-131`).
+- [x] All-identical-seed gate widened into `useDagreForAdded` predicate (`:148`) — preserves auto-layout-marker first-open. Pinned by new case F2.
+- [x] StrictMode double-invoke — single-effect dispose in `Canvas.tsx:55-76` preserved; the new callbacks are stable `useCallback`s.
+- [x] Project switch — `useProjectSync.ts:60-68` now resets `prevNodesRef.current = []` on `projectHash` change, preventing project-A slug leakage.
+- [x] Concurrent watcher + user drag — `getLiveNodes()` reads React Flow's reducer state, which has applied the drag synchronously.
+- [x] No re-render loop on drag — `nodes` not in effect deps; `getLiveNodes`/`getViewportCenter` are `useCallback([rf])`.
+- [x] First-render race — two-pass `seedApplied` flag preserved; `isFirstSync` computed before seed-apply block (`:120`) so the all-identical-seeds short-circuit still routes through dagre.
 
-- [x] `composeConsultationCommand` returns 13-element argv starting with `'claude'`
-- [x] Flags: `--model opus`, `--permission-mode dontAsk`, `--system-prompt <PROMPT>`, `--add-dir <root>`, `--allowedTools Read Grep Glob`
-- [x] No `-p`, `--output-format`, `--session-id`, `--max-budget-usd`
-- [x] `CONSULTATION_SYSTEM_PROMPT` correctly sourced from `@shared/consultation/systemPrompt`
+### Issue 2 — Consultation clipboard
 
-### Edge Cases
+**Expected Behavior**
+- [x] Handler attached before `xterm.onData` at `ConsultationPanel.tsx:52-55`; existing `xterm.onData(...)` keystroke wiring at `:68-71` untouched.
+- [x] **passthrough** — `clipboardHandler.ts:32-33` returns `true`.
+- [x] **swallow** — `:34-36` preventDefault + `false`.
+- [x] **copy-selection** — `:37-41` preventDefault + `writeText` + `clearSelection`.
+- [x] **paste** — `:42-57` preventDefault, `readText`, empty/id/status guards (status re-read at resolve time at `:49`), `encodeBracketedPaste`, `terminal.write`.
+- [x] Status read at event time from `consultationTerminal` slice (`ConsultationPanel.tsx:53-54`).
 
-- [x] No project open: `ConsultationRegion` returns `null` when `project === null` — ConsultationRegion.tsx:10
-- [x] Skill terminal active simultaneously: independent IDs, no store conflicts
-- [x] Spawn race: `statusRef.current !== 'idle'` guard prevents double-spawn — useConsultationTerminal.ts:22
-- [x] Panel close mid-spawn: cleanup calls `clearConsultationTerminal()` guarded by `statusRef.current === 'spawning'` — useConsultationTerminal.ts:35-38
-- [x] System prompt as argv element: direct string[] element, no shell escaping needed
+**Edge Cases**
+- [x] Permission denied/unavailable — `.catch(() => {})` on both clipboard calls (`clipboardHandler.ts:39, 55`).
+- [x] `status === 'spawning'` — `decideClipboardAction` returns `swallow` (paste branch only fires when status === 'active'). Confirmed by ConsultationPanel test "paste swallowed when status spawning".
+- [x] `status === 'exited'` — same swallow path. Confirmed by ConsultationPanel test "paste swallowed when status exited".
+- [x] `id === null` — explicit `if (!text || !currentId) return;` at `clipboardHandler.ts:48`. Confirmed by test "paste short-circuit when id is null".
+- [x] Empty / whitespace clipboard — `if (!wrapped) return;` at `:51`. Confirmed by test "paste with empty clipboard drops silently".
+- [x] Bracketed-paste-marker injection — `encodeBracketedPaste` strips embedded markers (unchanged module).
+- [x] Right-click — no changes to context menu handling.
 
-### Out of Scope — Confirmed Not Accidentally Implemented
+### Out of Scope (brief lines 116-123)
+- [x] `LayoutFileV1` format, `window.atrium.layout` IPC, `computeDagrePositions` — untouched.
+- [x] No new toolbar button, dialog, or settings toggle.
+- [x] No confirmation dialog on Re-layout.
+- [x] No right-click context menu added.
+- [x] No `consultationTerminal.status` transition changes; no spawn-hook changes.
+- [x] No deferred consultation-service file removal.
+- [x] No `composeConsultationCommand` or IPC changes.
+- [⚠️] **`TerminalModal` clipboard code** — see Deviations below.
 
-- [x] Consultation service files still on disk as dead code (`consultationService.ts`, `claudeInvoker.ts`, `streamParser.ts`, etc.)
-- [x] EdgeTab label unchanged ("Chat") — EdgeTab.tsx:34
-- [x] No session persistence or replay
-- [x] No auto-open on project load (still EdgeTab-gated)
-- [x] No changes to `composeCommand()` for existing skills
+## Deviations from Brief
 
-## IPC/Contract Integrity
+- **`TerminalModal.tsx` clipboard block was extracted, not left in place.** The brief's Out-of-Scope list said "Do NOT touch the main `TerminalModal` clipboard code." However, the review fix-loop (`review-all-report.md` Should Fix #1, applied in `fix-1-result.md`) extracted the 40-line inline `attachCustomKeyEventHandler` block from both `TerminalModal.tsx` and `ConsultationPanel.tsx` into a shared `src/renderer/src/terminal/clipboardHandler.ts` and replaced both call sites with `attachClipboardHandler(xterm, { getStatus, getId })`.
 
-- [x] `AtriumAPI.consultation` preload surface: single `spawnTerminal` method — api.ts:69-71
-- [x] Preload bridge: `ipcRenderer.invoke(IPC.consultation.spawnTerminal, args)` — index.ts:185-187
-- [x] `registerIpc` managers type: no `consultationService` — register.ts:40-44
-- [x] `ConsultationService` removed from `main/index.ts` — no instantiation, no `setWindow` calls
-- [x] Old 4-handler block replaced by single `consultation:spawnTerminal` test in wiredHandlers.test.ts
+  This is a behavior-preserving refactor: all 29 existing `TerminalModal.test.tsx` cases still pass, and the new clipboard module is byte-for-byte equivalent to the prior inline TerminalModal code modulo the `getStatus`/`getId` callbacks. The change was driven by review intent (prevent the two terminals from drifting — exactly the regression class this feature was created to fix). Flagging for transparency only; no action recommended.
 
-## Deleted Files (All Confirmed Gone)
-
-- [x] `hooks/useConsultation.ts`
-- [x] `ChatInput.tsx`, `MessageBubble.tsx`, `MessageList.tsx`, `ModelSelector.tsx`, `NewSessionButton.tsx`
-- [x] `__tests__/useConsultation.test.tsx`, `__tests__/ModelSelector.test.tsx`
+## Issues
+_None._
 
 ## Regressions
+_None found._ The 5 failing tests in the full suite are all pre-existing and unrelated to this feature:
+- 4× `claudeInvoker.test.ts` / `errorMapper.test.ts` — missing fixture files at `.ai-work/phase0/r1-happy*.jsonl` (documented as pre-existing in both phase-1 and phase-2 results).
+- 1× `watcherManager.test.ts` "start after stop" — known Windows `@parcel/watcher` flaky race; passes on isolated re-run.
 
-None within feature scope. 908 tests pass across 75 test files.
+The 5 lint errors and 13 typecheck errors are also all pre-existing in unrelated files (`wiredHandlers.test.ts`, `health.ts`, `useConsultationTerminal.ts`, `LaunchGate.test.tsx`, `ProjectPanel.test.tsx`) — documented in phase results.
 
-**Pre-existing failures (not regressions):** 4 tests in dead-code files `claudeInvoker.test.ts` and `errorMapper.test.ts` reference a missing fixture `.ai-work/phase0/r1-happy.jsonl`. These files are not modified by this feature and were failing before implementation.
-
-**Plan counting error (not a code issue):** Plan stated "11 elements" for `composeConsultationCommand`; correct count is 13. Implementation and test both assert 13 correctly.
+## Build / Lint / Test Status
+- **Build:** PASS (`npm run build` — main + preload + renderer bundles produced).
+- **Lint:** PASS for all changed files. 5 pre-existing errors in unrelated files remain.
+- **Typecheck:** PASS for all changed files. 13 pre-existing errors in unrelated files remain.
+- **Tests (feature-relevant):** 81/81 PASS
+  - `useProjectSync.test.tsx` — 27/27
+  - `Canvas.test.tsx` — 13/13
+  - `ConsultationPanel.test.tsx` — 12/12
+  - `TerminalModal.test.tsx` — 29/29
+- **Tests (full suite):** 922 passed / 5 failed / 1 skipped — failures all pre-existing and unrelated.

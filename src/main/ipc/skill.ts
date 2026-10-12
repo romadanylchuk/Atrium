@@ -36,6 +36,12 @@ export function registerSkillHandlers(
         return err(SkillErrorCode.COMPOSE_FAILED, message);
       }
 
+      // Auto-recover from a stuck non-idle state (e.g. Windows ConPTY missed an
+      // exit signal after a prior terminal). Mirrors the consultation handler.
+      if (terminalManager.getState() !== 'idle') {
+        terminalManager.shutdownForReuse();
+      }
+
       const result = terminalManager.spawn(args, req.cwd);
       if (!result.ok) {
         return err(SkillErrorCode.SPAWN_FAILED, result.error.message);

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { BrowserWindow } from 'electron';
 import { app } from 'electron';
-import { spawn as ptySpawn, type IPty } from 'node-pty';
+import { spawn as ptySpawn, type IPty, type IDisposable } from 'node-pty';
 import type { TerminalId } from '@shared/domain';
 import { TerminalErrorCode } from '@shared/errors';
 import { type Result, ok, err } from '@shared/result';
@@ -17,6 +17,14 @@ export class TerminalManager {
   #id: TerminalId | null = null;
   #window: BrowserWindow | null = null;
   #killTimer: ReturnType<typeof setTimeout> | null = null;
+  #ptySubs: IDisposable[] = [];
+
+  #disposePtySubs(): void {
+    for (const sub of this.#ptySubs) {
+      try { sub.dispose(); } catch { /* defensive */ }
+    }
+    this.#ptySubs = [];
+  }
 
   getState(): TerminalState {
     return this.#state;
@@ -73,24 +81,29 @@ export class TerminalManager {
     const id = ('t_' + randomUUID()) as TerminalId;
     this.#pty = pty;
     this.#id = id;
+    this.#disposePtySubs();
 
-    pty.onData((buf: string) => {
-      if (this.#id !== id) return;
-      if (this.#window === null || this.#window.isDestroyed()) return;
-      this.#window.webContents.send(IPC.terminal.onData, id, toArrayBuffer(buf));
-    });
+    this.#ptySubs.push(
+      pty.onData((buf: string) => {
+        if (this.#id !== id) return;
+        if (this.#window === null || this.#window.isDestroyed()) return;
+        this.#window.webContents.send(IPC.terminal.onData, id, toArrayBuffer(buf));
+      }),
+    );
 
-    pty.onExit(({ exitCode }: { exitCode: number | undefined }) => {
-      if (this.#id !== id) return;
-      if (this.#killTimer !== null) {
-        clearTimeout(this.#killTimer);
-        this.#killTimer = null;
-      }
-      this.#transition('exited');
-      if (this.#window !== null && !this.#window.isDestroyed()) {
-        this.#window.webContents.send(IPC.terminal.onExit, id, exitCode ?? null);
-      }
-    });
+    this.#ptySubs.push(
+      pty.onExit(({ exitCode }: { exitCode: number | undefined }) => {
+        if (this.#id !== id) return;
+        if (this.#killTimer !== null) {
+          clearTimeout(this.#killTimer);
+          this.#killTimer = null;
+        }
+        this.#transition('exited');
+        if (this.#window !== null && !this.#window.isDestroyed()) {
+          this.#window.webContents.send(IPC.terminal.onExit, id, exitCode ?? null);
+        }
+      }),
+    );
 
     this.#transition('active');
     return ok(id);
@@ -152,6 +165,7 @@ export class TerminalManager {
     }
 
     this.#transition('closing');
+    this.#disposePtySubs();
     try {
       this.#pty?.kill();
     } catch {
@@ -169,6 +183,7 @@ export class TerminalManager {
       clearTimeout(this.#killTimer);
       this.#killTimer = null;
     }
+    this.#disposePtySubs();
     const pty = this.#pty;
     this.#id = null; // nulled before kill so old onData/onExit callbacks return early
     this.#pty = null;

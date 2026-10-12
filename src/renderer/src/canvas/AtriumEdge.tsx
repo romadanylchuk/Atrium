@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from 'reactflow';
 import { resolveConnectionStyle } from './visualEncoding';
+import { DIMMED_EDGE_COLOR } from './legendHighlight';
 
 export type AtriumEdgeData = {
   type: string;
+  /** Greyed out by a legend highlight. */
+  dimmed?: boolean;
 };
 
 export function AtriumEdge({
@@ -15,6 +18,7 @@ export function AtriumEdge({
   sourcePosition,
   targetPosition,
   data,
+  markerEnd,
 }: EdgeProps<AtriumEdgeData>) {
   const rawType = data?.type ?? '';
   const { known, style } = resolveConnectionStyle(rawType);
@@ -36,10 +40,13 @@ export function AtriumEdge({
       <BaseEdge
         id={id}
         path={edgePath}
+        markerEnd={markerEnd}
         style={{
-          stroke: style.color,
+          stroke: data?.dimmed ? DIMMED_EDGE_COLOR : style.color,
           strokeWidth: style.width,
           strokeDasharray,
+          opacity: data?.dimmed ? 0.35 : 1,
+          transition: 'stroke 150ms, opacity 150ms',
         }}
       />
       <EdgeLabelRenderer>

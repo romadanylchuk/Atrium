@@ -3,6 +3,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { useAtriumStore } from '@renderer/store/atriumStore';
 import { XTERM_THEME, XTERM_FONT_FAMILY } from '@renderer/terminal/xtermTheme';
+import { attachClipboardHandler } from '@renderer/terminal/clipboardHandler';
 import { usePanelState } from './hooks/usePanelState';
 import { useAutoCloseTimer } from './hooks/useAutoCloseTimer';
 import { useConsultationTerminal } from './hooks/useConsultationTerminal';
@@ -48,6 +49,11 @@ export function ConsultationPanel(): JSX.Element {
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
 
+    attachClipboardHandler(xterm, {
+      getStatus: () => useAtriumStore.getState().consultationTerminal.status,
+      getId: () => useAtriumStore.getState().consultationTerminal.id,
+    });
+
     const offData = window.atrium.terminal.onData(id, (data) => {
       xterm.write(new Uint8Array(data));
     });
@@ -65,6 +71,10 @@ export function ConsultationPanel(): JSX.Element {
     });
 
     return () => {
+      if (resizeTimerRef.current) {
+        clearTimeout(resizeTimerRef.current);
+        resizeTimerRef.current = null;
+      }
       offData();
       offExit();
       offError();

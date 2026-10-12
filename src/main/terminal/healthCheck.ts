@@ -42,21 +42,31 @@ export async function checkClaude(): Promise<Result<HealthInfo, typeof HealthErr
       name: 'xterm-256color',
     });
 
+    const subs: Array<{ dispose: () => void }> = [];
+    const dispose = (): void => {
+      for (const s of subs) {
+        try { s.dispose(); } catch { /* ignore */ }
+      }
+      subs.length = 0;
+    };
+
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
+      dispose();
       try { pty.kill(); } catch { /* ignore */ }
       resolve(err(HealthErrorCode.HEALTH_TIMEOUT, `claude --version did not respond within ${HEALTH_TIMEOUT_MS}ms`));
     }, HEALTH_TIMEOUT_MS);
 
-    pty.onData((data: string) => {
+    subs.push(pty.onData((data: string) => {
       buffer += data;
-    });
+    }));
 
-    pty.onExit(({ exitCode }: { exitCode: number | undefined }) => {
+    subs.push(pty.onExit(({ exitCode }: { exitCode: number | undefined }) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      dispose();
 
       if ((exitCode ?? 1) !== 0) {
         resolve(err(HealthErrorCode.VERSION_UNPARSEABLE, `${buffer}, path: ${claudePath}`));
@@ -72,6 +82,6 @@ export async function checkClaude(): Promise<Result<HealthInfo, typeof HealthErr
       }
 
       resolve(ok({ claudePath, version: clean }));
-    });
+    }));
   });
 }

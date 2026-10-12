@@ -1,6 +1,9 @@
 import { useReactFlow } from 'reactflow';
 import { useAtriumStore } from '../store/atriumStore';
 
+/** Padding used for every "fit whole graph" computation (button, initial fit, zoom floor). */
+export const FIT_PADDING = 0.2;
+
 const BTN_STYLE: React.CSSProperties = {
   width: 26,
   height: 26,
@@ -97,7 +100,7 @@ export function CanvasControls() {
         data-testid="canvas-ctrl-fit"
         data-canvas-ctrl="true"
         style={BTN_STYLE}
-        onClick={() => fitView({ padding: 0.2 })}
+        onClick={() => fitView({ padding: FIT_PADDING, duration: 300 })}
         aria-label="Fit to view"
       >
         <FitViewIcon />

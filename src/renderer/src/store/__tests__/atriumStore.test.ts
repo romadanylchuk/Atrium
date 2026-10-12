@@ -638,3 +638,16 @@ describe('switchProject — consultation terminal integration', () => {
     expect(s.canvas).toEqual({ kind: 'ready' });
   });
 });
+
+describe('toggleLegendHighlight', () => {
+  it('sets, switches and clears the highlight', () => {
+    useAtriumStore.setState({ legendHighlight: null });
+    const { toggleLegendHighlight } = useAtriumStore.getState();
+    toggleLegendHighlight({ kind: 'maturity', value: 'ready' });
+    expect(useAtriumStore.getState().legendHighlight).toEqual({ kind: 'maturity', value: 'ready' });
+    toggleLegendHighlight({ kind: 'connection', value: 'dependency' });
+    expect(useAtriumStore.getState().legendHighlight).toEqual({ kind: 'connection', value: 'dependency' });
+    toggleLegendHighlight({ kind: 'connection', value: 'dependency' });
+    expect(useAtriumStore.getState().legendHighlight).toBeNull();
+  });
+});

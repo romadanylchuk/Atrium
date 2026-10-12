@@ -12,10 +12,22 @@ export interface UseProjectSyncParams {
   setNodes: (nodes: RFNode[]) => void;
   setEdges: (edges: RFEdge[]) => void;
   relayoutRequestId?: number;
+  /** Returns React Flow's current live node array (positions reflect user drags). */
+  getLiveNodes: () => RFNode[];
+  /** Returns the viewport center expressed in flow coordinates. Returns `{x:0,y:0}` if the container has no measurable rect. */
+  getViewportCenter: () => NodePosition;
 }
 
 export function useProjectSync(params: UseProjectSyncParams): void {
-  const { project, seedPositions, setNodes, setEdges, relayoutRequestId = 0 } = params;
+  const {
+    project,
+    seedPositions,
+    setNodes,
+    setEdges,
+    relayoutRequestId = 0,
+    getLiveNodes,
+    getViewportCenter,
+  } = params;
 
   // Track previous RF node list to diff against
   const prevNodesRef = useRef<RFNode[]>([]);
@@ -52,6 +64,7 @@ export function useProjectSync(params: UseProjectSyncParams): void {
       tracker.connType = new Set();
       tracker.staleLayoutSlugs = new Set();
       tracker.seedApplied = false;
+      prevNodesRef.current = [];
     }
 
     const prevNodes = prevNodesRef.current;
@@ -81,12 +94,16 @@ export function useProjectSync(params: UseProjectSyncParams): void {
       }
     }
 
-    // Build existing position map from current RF nodes (cleared on manual relayout)
+    // Build existing position map from React Flow's live store (source of truth for
+    // user-dragged positions). Cleared on manual relayout so dagre re-runs cleanly.
     const existingPositions = new Map<string, NodePosition>();
     if (!isRelayoutTrigger) {
-      for (const rfNode of prevNodes) {
-        if (!removedSlugs.has(rfNode.id)) {
-          existingPositions.set(rfNode.id, { x: rfNode.position.x, y: rfNode.position.y });
+      const liveNodes = getLiveNodes();
+      const liveById = new Map(liveNodes.map((n) => [n.id, n] as const));
+      for (const slug of nextSlugs) {
+        const live = liveById.get(slug);
+        if (live) {
+          existingPositions.set(slug, { x: live.position.x, y: live.position.y });
         }
       }
     }
@@ -94,9 +111,13 @@ export function useProjectSync(params: UseProjectSyncParams): void {
     // All-identical-seed gate: if multiple seeds all share the same coordinate,
     // treat as an auto-layout marker and skip seed application so dagre runs fresh.
     const allIdenticalSeeds =
-      seedPositions &&
+      !!seedPositions &&
       seedPositions.size > 1 &&
       new Set(Array.from(seedPositions.values()).map((p) => `${p.x}_${p.y}`)).size === 1;
+
+    // Compute first-sync status BEFORE the seed-application block flips `seedApplied`,
+    // so the dagre predicate sees the pre-application state.
+    const isFirstSync = prevNodes.length === 0 && !tracker.seedApplied;
 
     // First pass for this projectHash: seeds overwrite existing (which may be dagre from an
     // empty-seed first render). Only flip seedApplied when seeds are non-empty so the two-render
@@ -120,14 +141,32 @@ export function useProjectSync(params: UseProjectSyncParams): void {
       tracker.seedApplied = true;
     }
 
-    // Compute dagre positions for new nodes
-    let dagrePositions = new Map<string, NodePosition>();
+    // Dagre runs for added slugs only on first project open with no usable seeds,
+    // or on an explicit re-layout request. All other in-session adds go to viewport center.
+    const useDagreForAdded =
+      isRelayoutTrigger ||
+      (isFirstSync && (!seedPositions || seedPositions.size === 0 || allIdenticalSeeds));
+
+    // Compute positions for newly added slugs
+    const addedPositions = new Map<string, NodePosition>();
     if (addedSlugs.size > 0) {
-      dagrePositions = computeDagrePositions(
-        project.nodes.map((n) => ({ slug: n.slug })),
-        project.connections.map((c) => ({ from: c.from, to: c.to })),
-        existingPositions,
-      );
+      if (useDagreForAdded) {
+        const dagre = computeDagrePositions(
+          project.nodes.map((n) => ({ slug: n.slug })),
+          project.connections.map((c) => ({ from: c.from, to: c.to, type: c.type })),
+          existingPositions,
+        );
+        for (const [slug, pos] of dagre) {
+          addedPositions.set(slug, pos);
+        }
+      } else {
+        const center = getViewportCenter();
+        for (const slug of addedSlugs) {
+          if (!existingPositions.has(slug)) {
+            addedPositions.set(slug, { x: center.x, y: center.y });
+          }
+        }
+      }
     }
 
     // Build new RF nodes
@@ -139,10 +178,10 @@ export function useProjectSync(params: UseProjectSyncParams): void {
         console.warn(`[atrium] Unknown node maturity: "${node.maturity}"`);
       }
 
-      // Position: existing (from RF state) > dagre-assigned > origin fallback
+      // Position: existing (from RF live store / seeds) > newly-assigned > origin fallback
       const pos =
         existingPositions.get(node.slug) ??
-        dagrePositions.get(node.slug) ??
+        addedPositions.get(node.slug) ??
         { x: 0, y: 0 };
 
       return {
@@ -183,5 +222,5 @@ export function useProjectSync(params: UseProjectSyncParams): void {
     prevNodesRef.current = nextRFNodes;
     setNodes(nextRFNodes);
     setEdges(nextRFEdges);
-  }, [project, seedPositions, setNodes, setEdges, relayoutRequestId]);
+  }, [project, seedPositions, setNodes, setEdges, relayoutRequestId, getLiveNodes, getViewportCenter]);
 }

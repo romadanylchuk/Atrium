@@ -94,6 +94,8 @@ function defaultConsultationTerminalSlice(): ConsultationTerminalSlice {
 // Store shape
 // ---------------------------------------------------------------------------
 
+export type LegendHighlight = { kind: 'maturity' | 'connection'; value: string };
+
 type SwitchProjectErrorCode = 'BLOCKED_BY_TERMINAL' | ProjectErrorCode;
 
 export type AtriumStore = {
@@ -130,6 +132,9 @@ export type AtriumStore = {
 
   // --- Relayout slice ---
   relayoutRequestId: number;
+
+  // --- Legend highlight: greys out everything not matching the picked legend row ---
+  legendHighlight: LegendHighlight | null;
 
   // --- Consultation slice ---
   consultation: ConsultationSlice;
@@ -175,6 +180,7 @@ export type AtriumStore = {
   _setRecheckHealth: (fn: (() => void) | null) => void;
 
   triggerRelayout: () => void;
+  toggleLegendHighlight: (highlight: LegendHighlight) => void;
 
   // --- Consultation panel actions ---
   openConsultationPanel: () => void;
@@ -210,6 +216,7 @@ export const useAtriumStore = create<AtriumStore>((set, get) => ({
   installState: { kind: 'idle' } as const,
   _recheckHealth: null,
   relayoutRequestId: 0,
+  legendHighlight: null,
   consultation: defaultConsultationSlice(),
   consultationTerminal: defaultConsultationTerminalSlice(),
 
@@ -227,6 +234,7 @@ export const useAtriumStore = create<AtriumStore>((set, get) => ({
       activePanel: 'project',
       toolbarOverlay: null,
       canvas: canvasEmpty(),
+      legendHighlight: null,
     });
   },
 
@@ -266,6 +274,7 @@ export const useAtriumStore = create<AtriumStore>((set, get) => ({
         tooltipTarget: null,
         activePanel: 'project',
         terminal: defaultTerminalSlice(),
+        legendHighlight: null,
       }));
       // setProject handles project + canvas.
       get().setProject(r.data);
@@ -380,6 +389,14 @@ export const useAtriumStore = create<AtriumStore>((set, get) => ({
 
   triggerRelayout() {
     set((s) => ({ relayoutRequestId: s.relayoutRequestId + 1 }));
+  },
+
+  toggleLegendHighlight(highlight) {
+    set((s) => {
+      const cur = s.legendHighlight;
+      const same = cur !== null && cur.kind === highlight.kind && cur.value === highlight.value;
+      return { legendHighlight: same ? null : highlight };
+    });
   },
 
   // -------------------------------------------------------------------------

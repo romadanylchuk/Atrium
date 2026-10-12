@@ -4,8 +4,7 @@ import { FitAddon } from 'xterm-addon-fit';
 import { useAtriumStore } from '../store/atriumStore';
 import { decideNextTerminalState, resolveInitOutcome } from './terminalState';
 import { XTERM_THEME, XTERM_FONT_FAMILY } from './xtermTheme';
-import { decideClipboardAction } from './clipboardKeymap';
-import { encodeBracketedPaste } from './bracketedPaste';
+import { attachClipboardHandler } from './clipboardHandler';
 import 'xterm/css/xterm.css';
 
 declare global {
@@ -53,41 +52,9 @@ export function TerminalModal(): JSX.Element | null {
     xterm.open(containerRef.current);
     fitAddon.fit();
 
-    xterm.attachCustomKeyEventHandler((e: KeyboardEvent): boolean => {
-      const selection = xterm.hasSelection() ? xterm.getSelection() : '';
-      const { id: currentId, status: currentStatus } = useAtriumStore.getState().terminal;
-      const action = decideClipboardAction(e, { hasSelection: selection.length > 0, status: currentStatus });
-      switch (action.kind) {
-        case 'passthrough':
-          return true;
-        case 'swallow':
-          e.preventDefault();
-          return false;
-        case 'copy-selection':
-          e.preventDefault();
-          void navigator.clipboard.writeText(selection).catch(() => {});
-          xterm.clearSelection();
-          return false;
-        case 'paste':
-          e.preventDefault();
-          void navigator.clipboard
-            .readText()
-            .then((text) => {
-              if (!text || !currentId) return;
-              if (useAtriumStore.getState().terminal.status !== 'active') return;
-              const wrapped = encodeBracketedPaste(text);
-              if (!wrapped) return;
-              const enc = new TextEncoder().encode(wrapped);
-              window.atrium.terminal.write(currentId, enc.buffer);
-            })
-            .catch(() => {});
-          return false;
-        default: {
-          const _exhaustive: never = action;
-          void _exhaustive;
-          return true;
-        }
-      }
+    attachClipboardHandler(xterm, {
+      getStatus: () => useAtriumStore.getState().terminal.status,
+      getId: () => useAtriumStore.getState().terminal.id,
     });
 
     xtermRef.current = xterm;
@@ -95,6 +62,10 @@ export function TerminalModal(): JSX.Element | null {
     hasEmittedActiveRef.current = false;
 
     return () => {
+      if (resizeTimerRef.current) {
+        clearTimeout(resizeTimerRef.current);
+        resizeTimerRef.current = null;
+      }
       xterm.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;

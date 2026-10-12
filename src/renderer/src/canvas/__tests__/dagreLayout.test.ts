@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeDagrePositions, NODESEP, RANKSEP } from '../dagreLayout';
+import { computeDagrePositions, selectLayoutEdges, NODESEP, RANKSEP } from '../dagreLayout';
 import type { NodePosition } from '@shared/layout';
 
 function makeNodes(slugs: string[]) {
@@ -7,12 +7,12 @@ function makeNodes(slugs: string[]) {
 }
 
 describe('dagre constants', () => {
-  it('NODESEP is 30', () => {
-    expect(NODESEP).toBe(30);
+  it('NODESEP is 40', () => {
+    expect(NODESEP).toBe(40);
   });
 
-  it('RANKSEP is 40', () => {
-    expect(RANKSEP).toBe(40);
+  it('RANKSEP is 80', () => {
+    expect(RANKSEP).toBe(80);
   });
 });
 
@@ -67,5 +67,55 @@ describe('computeDagrePositions', () => {
       expect(pos1.x).toBe(pos2.x);
       expect(pos1.y).toBe(pos2.y);
     }
+  });
+});
+
+describe('selectLayoutEdges', () => {
+  const slugs = new Set(['a', 'b', 'c', 'd', 'e']);
+
+  it('drops transitive dependency shortcuts', () => {
+    const edges = selectLayoutEdges(slugs, [
+      { from: 'a', to: 'b', type: 'dependency' },
+      { from: 'b', to: 'c', type: 'dependency' },
+      { from: 'a', to: 'c', type: 'dependency' },
+    ]);
+    expect(edges).toEqual([
+      { from: 'a', to: 'b' },
+      { from: 'b', to: 'c' },
+    ]);
+  });
+
+  it('ignores non-hierarchical edges between already-placed nodes but keeps them for floating nodes', () => {
+    const edges = selectLayoutEdges(slugs, [
+      { from: 'a', to: 'b', type: 'dependency' },
+      { from: 'a', to: 'b', type: 'shared-concern' },
+      { from: 'b', to: 'd', type: 'shared-concern' },
+    ]);
+    expect(edges).toEqual([
+      { from: 'a', to: 'b' },
+      { from: 'b', to: 'd' },
+    ]);
+  });
+
+  it('places a node between its parent and child ranks', () => {
+    const pos = computeDagrePositions(
+      makeNodes(['a', 'b', 'c']),
+      [
+        { from: 'a', to: 'c', type: 'dependency' },
+        { from: 'a', to: 'b', type: 'dependency' },
+        { from: 'b', to: 'c', type: 'dependency' },
+      ],
+      new Map(),
+    );
+    expect(pos.get('a')!.y).toBeLessThan(pos.get('b')!.y);
+    expect(pos.get('b')!.y).toBeLessThan(pos.get('c')!.y);
+  });
+
+  it('survives dependency cycles', () => {
+    const edges = selectLayoutEdges(slugs, [
+      { from: 'a', to: 'b', type: 'dependency' },
+      { from: 'b', to: 'a', type: 'dependency' },
+    ]);
+    expect(edges.length).toBe(2);
   });
 });

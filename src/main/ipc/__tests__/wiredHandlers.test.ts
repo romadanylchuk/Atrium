@@ -64,6 +64,8 @@ describe('terminal wired handlers', () => {
       closeAfterExit: vi.fn(),
       write: vi.fn(),
       resize: vi.fn(),
+      getState: vi.fn().mockReturnValue('idle'),
+      shutdownForReuse: vi.fn(),
     };
     const fake = makeFullFakeIpcMain();
     registerTerminalHandlers(manager as never, fake);
@@ -71,6 +73,27 @@ describe('terminal wired handlers', () => {
     const result = await fake.invokeChannel(IPC.terminal.spawn, ['claude'], '/tmp/proj');
     expect(manager.spawn).toHaveBeenCalledOnce();
     expect(manager.spawn).toHaveBeenCalledWith(['claude'], '/tmp/proj');
+    expect(manager.shutdownForReuse).not.toHaveBeenCalled();
+    expect(result).toEqual(spawnResult);
+  });
+
+  it('terminal:spawn auto-recovers from a stuck non-idle manager before spawning', async () => {
+    const spawnResult = ok('t_abc' as TerminalId);
+    const manager = {
+      spawn: vi.fn().mockReturnValue(spawnResult),
+      kill: vi.fn(),
+      closeAfterExit: vi.fn(),
+      write: vi.fn(),
+      resize: vi.fn(),
+      getState: vi.fn().mockReturnValue('active'),
+      shutdownForReuse: vi.fn(),
+    };
+    const fake = makeFullFakeIpcMain();
+    registerTerminalHandlers(manager as never, fake);
+
+    const result = await fake.invokeChannel(IPC.terminal.spawn, ['claude'], '/tmp/proj');
+    expect(manager.shutdownForReuse).toHaveBeenCalledOnce();
+    expect(manager.spawn).toHaveBeenCalledOnce();
     expect(result).toEqual(spawnResult);
   });
 
@@ -376,12 +399,14 @@ describe('consultation wired handlers', () => {
 // ---------------------------------------------------------------------------
 
 describe('skill wired handlers', () => {
-  const makeManager = (spawnResult = ok('t_abc' as TerminalId)) => ({
+  const makeManager = (spawnResult = ok('t_abc' as TerminalId), state: 'idle' | 'active' | 'spawning' | 'exited' | 'closing' = 'idle') => ({
     spawn: vi.fn().mockReturnValue(spawnResult),
     kill: vi.fn(),
     closeAfterExit: vi.fn(),
     write: vi.fn(),
     resize: vi.fn(),
+    getState: vi.fn().mockReturnValue(state),
+    shutdownForReuse: vi.fn(),
   });
 
   it.each(['init', 'explore', 'decide', 'map', 'finalize', 'free', 'new', 'triage', 'audit', 'status'] as const)(
@@ -407,4 +432,14 @@ describe('skill wired handlers', () => {
     expect(manager.spawn).not.toHaveBeenCalled();
   });
 
+  it('skill:spawn auto-recovers from a stuck non-idle manager before spawning', async () => {
+    const manager = makeManager(ok('t_abc' as TerminalId), 'active');
+    const fake = makeFullFakeIpcMain();
+    registerSkillHandlers(manager as never, fake);
+
+    const result = await fake.invokeChannel(IPC.skill.spawn, { skill: 'init', cwd: '/tmp/proj' });
+    expect(manager.shutdownForReuse).toHaveBeenCalledOnce();
+    expect(manager.spawn).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ ok: true });
+  });
 });

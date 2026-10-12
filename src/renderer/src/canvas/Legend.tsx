@@ -1,4 +1,4 @@
-import { useAtriumStore } from '../store/atriumStore';
+import { useAtriumStore, type LegendHighlight } from '../store/atriumStore';
 import { resolveConnectionStyle, resolveMaturityStyle } from './visualEncoding';
 import type { NodeMaturity } from '@shared/domain';
 import {
@@ -12,6 +12,8 @@ const MATURITY_ORDER: NodeMaturity[] = ['raw-idea', 'explored', 'decided', 'read
 
 export function Legend() {
   const project = useAtriumStore((s) => s.project);
+  const highlight = useAtriumStore((s) => s.legendHighlight);
+  const toggleLegendHighlight = useAtriumStore((s) => s.toggleLegendHighlight);
 
   if (!project || (project.nodes.length === 0 && project.connections.length === 0)) {
     return null;
@@ -29,6 +31,9 @@ export function Legend() {
   const unknownMaturities = rawMaturities.filter((m) => !MATURITY_ORDER.includes(m as NodeMaturity));
   const maturities = [...knownMaturities, ...unknownMaturities];
 
+  const isActive = (h: LegendHighlight) =>
+    highlight !== null && highlight.kind === h.kind && highlight.value === h.value;
+
   const sectionHeaderStyle: React.CSSProperties = {
     color: '#6a6a72',
     textTransform: 'uppercase',
@@ -37,10 +42,25 @@ export function Legend() {
     marginBottom: '2px',
   };
 
-  const rowStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
+  const rowStyle = (h: LegendHighlight): React.CSSProperties => {
+    const active = isActive(h);
+    return {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      width: '100%',
+      margin: 0,
+      padding: '2px 4px',
+      marginLeft: '-4px',
+      border: 'none',
+      borderRadius: '3px',
+      background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+      cursor: 'pointer',
+      textAlign: 'left',
+      font: 'inherit',
+      opacity: highlight !== null && !active ? 0.45 : 1,
+      transition: 'opacity 150ms, background 150ms',
+    };
   };
 
   const labelStyle: React.CSSProperties = {
@@ -66,6 +86,7 @@ export function Legend() {
         zIndex: 5,
       }}
     >
+      <style>{`[data-legend-row]:hover { background: rgba(255,255,255,0.05) !important; opacity: 1 !important; }`}</style>
       {/* Connection types section */}
       {connTypes.length > 0 && (
         <div>
@@ -76,8 +97,18 @@ export function Legend() {
             const description = isKnownConnectionType(type)
               ? CONNECTION_TYPE_DESCRIPTIONS[type]
               : UNKNOWN_CONNECTION_DESCRIPTION;
+            const h: LegendHighlight = { kind: 'connection', value: type };
             return (
-              <div key={type} style={rowStyle} title={description}>
+              <button
+                type="button"
+                key={type}
+                data-legend-row="connection"
+                data-testid={`legend-connection-${type}`}
+                aria-pressed={isActive(h)}
+                style={rowStyle(h)}
+                title={description}
+                onClick={() => toggleLegendHighlight(h)}
+              >
                 <svg width="16" height="2" viewBox="0 0 16 2">
                   <line
                     x1="0" y1="1" x2="16" y2="1"
@@ -87,7 +118,7 @@ export function Legend() {
                   />
                 </svg>
                 <span style={labelStyle}>{type}</span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -100,8 +131,17 @@ export function Legend() {
           {maturities.map((maturity) => {
             const { style } = resolveMaturityStyle(maturity);
             const isEllipse = style.borderRadius === '50% / 50%';
+            const h: LegendHighlight = { kind: 'maturity', value: maturity };
             return (
-              <div key={maturity} style={rowStyle}>
+              <button
+                type="button"
+                key={maturity}
+                data-legend-row="maturity"
+                data-testid={`legend-maturity-${maturity}`}
+                aria-pressed={isActive(h)}
+                style={rowStyle(h)}
+                onClick={() => toggleLegendHighlight(h)}
+              >
                 <svg width="12" height="8" viewBox="0 0 12 8">
                   <rect
                     x="0" y="0" width="12" height="8"
@@ -113,7 +153,7 @@ export function Legend() {
                   />
                 </svg>
                 <span style={labelStyle}>{maturity}</span>
-              </div>
+              </button>
             );
           })}
         </div>

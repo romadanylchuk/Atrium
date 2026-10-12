@@ -6,6 +6,8 @@ import type { ProjectState, NodeData, Connection } from '@shared/domain';
 import type { Node as RFNode, Edge as RFEdge } from 'reactflow';
 import type { NodePosition } from '@shared/layout';
 
+const DEFAULT_VIEWPORT_CENTER: NodePosition = { x: 500, y: 300 };
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -52,19 +54,58 @@ function renderSync(
   initialProject: ProjectState | null = null,
   initialSeedPositions?: Map<string, NodePosition>,
   initialRelayoutId = 0,
+  options?: {
+    /** Override the default getLiveNodes (which mirrors the last setNodes call). */
+    getLiveNodes?: () => RFNode[];
+    /** Override the default viewport center (default `DEFAULT_VIEWPORT_CENTER`). */
+    getViewportCenter?: () => NodePosition;
+  },
 ) {
-  const setNodes = vi.fn<(nodes: RFNode[]) => void>();
+  let lastEmitted: RFNode[] = [];
+  const setNodes = vi.fn<(nodes: RFNode[]) => void>().mockImplementation((n) => {
+    lastEmitted = n;
+  });
   const setEdges = vi.fn<(edges: RFEdge[]) => void>();
+
+  // Default: mirror the last setNodes output so most existing tests behave as before.
+  const liveNodesOverrideRef: { current: (() => RFNode[]) | null } = {
+    current: options?.getLiveNodes ?? null,
+  };
+  const viewportCenterOverrideRef: { current: (() => NodePosition) | null } = {
+    current: options?.getViewportCenter ?? null,
+  };
+  const getLiveNodes = (): RFNode[] =>
+    liveNodesOverrideRef.current ? liveNodesOverrideRef.current() : lastEmitted;
+  const getViewportCenter = (): NodePosition =>
+    viewportCenterOverrideRef.current ? viewportCenterOverrideRef.current() : DEFAULT_VIEWPORT_CENTER;
 
   type Props = { project: ProjectState | null; seedPositions?: Map<string, NodePosition>; relayoutRequestId?: number };
   const { rerender } = renderHook(
     ({ project, seedPositions, relayoutRequestId }: Props) => {
-      useProjectSync({ project, seedPositions, setNodes, setEdges, relayoutRequestId });
+      useProjectSync({
+        project,
+        seedPositions,
+        setNodes,
+        setEdges,
+        relayoutRequestId,
+        getLiveNodes,
+        getViewportCenter,
+      });
     },
     { initialProps: { project: initialProject, seedPositions: initialSeedPositions, relayoutRequestId: initialRelayoutId } as Props },
   );
 
-  return { setNodes, setEdges, rerender };
+  return {
+    setNodes,
+    setEdges,
+    rerender,
+    setLiveNodesOverride: (fn: (() => RFNode[]) | null) => {
+      liveNodesOverrideRef.current = fn;
+    },
+    setViewportCenterOverride: (fn: (() => NodePosition) | null) => {
+      viewportCenterOverrideRef.current = fn;
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +217,7 @@ describe('useProjectSync diff cases', () => {
     expect(edges).toHaveLength(0);
   });
 
-  it('case 7: slug renamed → old slug removed + new slug added with dagre position', () => {
+  it('case 7: slug renamed → new slug placed at viewport center', () => {
     const { setNodes, rerender } = renderSync(makeProject([makeNode('alpha')]));
 
     act(() => {
@@ -187,8 +228,7 @@ describe('useProjectSync diff cases', () => {
     expect(nodes.find((n) => n.id === 'alpha')).toBeUndefined();
     const newNode = nodes.find((n) => n.id === 'alpha-v2');
     expect(newNode).toBeDefined();
-    expect(Number.isFinite(newNode!.position.x)).toBe(true);
-    expect(Number.isFinite(newNode!.position.y)).toBe(true);
+    expect(newNode!.position).toEqual(DEFAULT_VIEWPORT_CENTER);
   });
 
   it('case 8: rapid sequential updates → setNodes reflects only last project state', () => {
@@ -460,6 +500,37 @@ describe('seed rehydration precedence', () => {
     expect(uniquePositions.size).toBeGreaterThan(1);
   });
 
+  it('case F2: all-identical seeds → second render preserves first-render positions (no re-dagre)', () => {
+    // Pins the seedApplied=true short-circuit on the all-identical-seeds path: the second
+    // render must not re-fire dagre (no relayout) and must not re-stack nodes at the seed
+    // origin; it should read positions back from the live store (mirrored setNodes output).
+    const seeds = new Map<string, NodePosition>([
+      ['a', { x: 0, y: 0 }],
+      ['b', { x: 0, y: 0 }],
+      ['c', { x: 0, y: 0 }],
+    ]);
+    const proj = makeProject(
+      [makeNode('a'), makeNode('b'), makeNode('c')],
+      [makeConnection('a', 'b'), makeConnection('b', 'c')],
+      'hash-f2',
+    );
+
+    const { setNodes, rerender } = renderSync(proj, seeds);
+
+    const firstNodes = setNodes.mock.calls.at(-1)![0];
+    const firstPositions = new Map(firstNodes.map((n) => [n.id, { ...n.position }]));
+
+    act(() => {
+      rerender({ project: { ...proj }, seedPositions: seeds });
+    });
+
+    const secondNodes = setNodes.mock.calls.at(-1)![0];
+    expect(secondNodes).toHaveLength(3);
+    for (const n of secondNodes) {
+      expect(n.position).toEqual(firstPositions.get(n.id));
+    }
+  });
+
   it('case G: relayoutRequestId increment forces dagre re-run, changing all positions', () => {
     const seeds = new Map<string, NodePosition>([
       ['a', { x: 100, y: 100 }],
@@ -472,11 +543,21 @@ describe('seed rehydration precedence', () => {
       'hash-g',
     );
 
-    const { setNodes, rerender } = renderSync(proj, seeds, 0);
+    const { setNodes, rerender, setLiveNodesOverride } = renderSync(proj, seeds, 0);
 
     // After first render with seeds applied, positions come from seeds
     const firstNodes = setNodes.mock.calls.at(-1)![0];
     const firstPositions = new Map(firstNodes.map((n) => [n.id, n.position]));
+
+    // Simulate user-drag positions so we can assert relayout does not preserve them either
+    const dragPositions = new Map<string, NodePosition>([
+      ['a', { x: 1, y: 1 }],
+      ['b', { x: 2, y: 2 }],
+      ['c', { x: 3, y: 3 }],
+    ]);
+    setLiveNodesOverride(() =>
+      firstNodes.map((n) => ({ ...n, position: dragPositions.get(n.id)! })),
+    );
 
     // Trigger relayout by incrementing relayoutRequestId
     act(() => {
@@ -485,14 +566,20 @@ describe('seed rehydration precedence', () => {
 
     const secondNodes = setNodes.mock.calls.at(-1)![0];
     expect(secondNodes).toHaveLength(3);
-    // Positions should have changed from seed values (dagre ran)
+    // Positions should have changed from seed values AND from the drag (live) values (dagre ran)
     const secondPositions = new Map(secondNodes.map((n) => [n.id, n.position]));
-    const allUnchanged = ['a', 'b', 'c'].every(
+    const allUnchangedFromSeed = ['a', 'b', 'c'].every(
       (id) =>
         secondPositions.get(id)!.x === firstPositions.get(id)!.x &&
         secondPositions.get(id)!.y === firstPositions.get(id)!.y,
     );
-    expect(allUnchanged).toBe(false);
+    expect(allUnchangedFromSeed).toBe(false);
+    const anyMatchesDrag = ['a', 'b', 'c'].some(
+      (id) =>
+        secondPositions.get(id)!.x === dragPositions.get(id)!.x &&
+        secondPositions.get(id)!.y === dragPositions.get(id)!.y,
+    );
+    expect(anyMatchesDrag).toBe(false);
   });
 
   it('case E: empty-then-populated two-pass — seed wins on populated pass', () => {
@@ -517,5 +604,132 @@ describe('seed rehydration precedence', () => {
     const secondAlpha = secondNodes.find((n) => n.id === 'alpha')!;
     expect(secondAlpha.position.x).toBe(777);
     expect(secondAlpha.position.y).toBe(888);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sticky-position + viewport-center cases (H, I, J, K, L)
+// ---------------------------------------------------------------------------
+
+describe('sticky positions + viewport-center add', () => {
+  it('case H: position read from getLiveNodes survives re-sync (simulated drag)', () => {
+    const proj = makeProject([makeNode('alpha')], [], 'hash-h');
+
+    const { setNodes, rerender, setLiveNodesOverride } = renderSync(proj);
+
+    // After first render, alpha has a dagre position
+    const firstNodes = setNodes.mock.calls.at(-1)![0];
+    const firstAlpha = firstNodes.find((n) => n.id === 'alpha')!;
+    expect(firstAlpha).toBeDefined();
+
+    // Simulate user drag: getLiveNodes now reports alpha at {555,666}
+    setLiveNodesOverride(() => [{ ...firstAlpha, position: { x: 555, y: 666 } }]);
+
+    act(() => {
+      rerender({ project: { ...proj } });
+    });
+
+    const secondNodes = setNodes.mock.calls.at(-1)![0];
+    const secondAlpha = secondNodes.find((n) => n.id === 'alpha')!;
+    expect(secondAlpha.position).toEqual({ x: 555, y: 666 });
+  });
+
+  it('case I: maturity change preserves dragged position', () => {
+    const proj = makeProject([makeNode('alpha', 'explored')], [], 'hash-i');
+
+    const { setNodes, rerender, setLiveNodesOverride } = renderSync(proj);
+    const firstNodes = setNodes.mock.calls.at(-1)![0];
+    const firstAlpha = firstNodes.find((n) => n.id === 'alpha')!;
+
+    setLiveNodesOverride(() => [{ ...firstAlpha, position: { x: 555, y: 666 } }]);
+
+    act(() => {
+      rerender({ project: makeProject([makeNode('alpha', 'decided')], [], 'hash-i') });
+    });
+
+    const secondNodes = setNodes.mock.calls.at(-1)![0];
+    const secondAlpha = secondNodes.find((n) => n.id === 'alpha')!;
+    expect(secondAlpha.position).toEqual({ x: 555, y: 666 });
+    expect((secondAlpha.data as { maturity: string }).maturity).toBe('decided');
+  });
+
+  it('case J: new slug mid-session lands at viewport center, not dagre', () => {
+    const proj1 = makeProject([makeNode('alpha')], [], 'hash-j');
+    const { setNodes, rerender } = renderSync(proj1);
+
+    const firstNodes = setNodes.mock.calls.at(-1)![0];
+    const alphaPos = firstNodes.find((n) => n.id === 'alpha')!.position;
+
+    act(() => {
+      rerender({ project: makeProject([makeNode('alpha'), makeNode('beta')], [], 'hash-j') });
+    });
+
+    const secondNodes = setNodes.mock.calls.at(-1)![0];
+    const alpha = secondNodes.find((n) => n.id === 'alpha')!;
+    const beta = secondNodes.find((n) => n.id === 'beta')!;
+    expect(alpha.position).toEqual(alphaPos);
+    expect(beta.position).toEqual(DEFAULT_VIEWPORT_CENTER);
+  });
+
+  it('case K: multiple new slugs in same tick stack at viewport center', () => {
+    const proj1 = makeProject([makeNode('alpha')], [], 'hash-k');
+    const { setNodes, rerender } = renderSync(proj1);
+
+    act(() => {
+      rerender({
+        project: makeProject(
+          [makeNode('alpha'), makeNode('beta'), makeNode('gamma')],
+          [],
+          'hash-k',
+        ),
+      });
+    });
+
+    const nodes = setNodes.mock.calls.at(-1)![0];
+    const beta = nodes.find((n) => n.id === 'beta')!;
+    const gamma = nodes.find((n) => n.id === 'gamma')!;
+    expect(beta.position).toEqual(DEFAULT_VIEWPORT_CENTER);
+    expect(gamma.position).toEqual(DEFAULT_VIEWPORT_CENTER);
+  });
+
+  it('case L: relayout runs dagre even when getLiveNodes reports dragged positions', () => {
+    const seeds = new Map<string, NodePosition>([
+      ['a', { x: 100, y: 100 }],
+      ['b', { x: 200, y: 200 }],
+      ['c', { x: 300, y: 300 }],
+    ]);
+    const proj = makeProject(
+      [makeNode('a'), makeNode('b'), makeNode('c')],
+      [makeConnection('a', 'b'), makeConnection('b', 'c')],
+      'hash-l',
+    );
+
+    const { setNodes, rerender, setLiveNodesOverride } = renderSync(proj, seeds, 0);
+    const firstNodes = setNodes.mock.calls.at(-1)![0];
+
+    const dragPositions = new Map<string, NodePosition>([
+      ['a', { x: 1, y: 1 }],
+      ['b', { x: 2, y: 2 }],
+      ['c', { x: 3, y: 3 }],
+    ]);
+    setLiveNodesOverride(() =>
+      firstNodes.map((n) => ({ ...n, position: dragPositions.get(n.id)! })),
+    );
+
+    act(() => {
+      rerender({ project: proj, seedPositions: seeds, relayoutRequestId: 1 });
+    });
+
+    const secondNodes = setNodes.mock.calls.at(-1)![0];
+    const secondPositions = new Map(secondNodes.map((n) => [n.id, n.position]));
+
+    // Not dragged
+    for (const id of ['a', 'b', 'c']) {
+      const p = secondPositions.get(id)!;
+      expect(p).not.toEqual(dragPositions.get(id));
+    }
+    // Not all identical
+    const uniqueKeys = new Set(secondNodes.map((n) => `${n.position.x}_${n.position.y}`));
+    expect(uniqueKeys.size).toBeGreaterThan(1);
   });
 });

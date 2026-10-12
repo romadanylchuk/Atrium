@@ -40,7 +40,14 @@ export function registerTerminalHandlers(
 
   safeHandle(
     IPC.terminal.spawn,
-    (_, args, cwd) => Promise.resolve(manager.spawn(args as string[], cwd as string)),
+    (_, args, cwd) => {
+      // Auto-recover from a stuck non-idle state (e.g. Windows ConPTY missed an
+      // exit signal after a prior terminal). Same pattern as consultation/skill.
+      if (manager.getState() !== 'idle') {
+        manager.shutdownForReuse();
+      }
+      return Promise.resolve(manager.spawn(args as string[], cwd as string));
+    },
     ipc,
   );
 

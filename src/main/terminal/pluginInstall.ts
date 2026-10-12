@@ -50,24 +50,34 @@ function spawnStep(
 
     onPty(pty);
 
+    const subs: Array<{ dispose: () => void }> = [];
+    const dispose = (): void => {
+      for (const s of subs) {
+        try { s.dispose(); } catch { /* ignore */ }
+      }
+      subs.length = 0;
+    };
+
     const timer = setTimeout(() => {
       if (stepSettled) return;
       stepSettled = true;
+      dispose();
       try { pty.kill(); } catch { /* ignore */ }
       resolve({ exitCode: 1, timedOut: true, stdout: buffer });
     }, INSTALL_STEP_TIMEOUT_MS);
 
-    pty.onData((data: string) => {
+    subs.push(pty.onData((data: string) => {
       buffer += data;
       onData(data);
-    });
+    }));
 
-    pty.onExit(({ exitCode }: { exitCode: number | undefined }) => {
+    subs.push(pty.onExit(({ exitCode }: { exitCode: number | undefined }) => {
       if (stepSettled) return;
       stepSettled = true;
       clearTimeout(timer);
+      dispose();
       resolve({ exitCode: exitCode ?? 1, timedOut: false, stdout: buffer });
-    });
+    }));
   });
 }
 
