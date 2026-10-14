@@ -1,12 +1,13 @@
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type JSX } from 'react';
 import { useAtriumStore } from '../store/atriumStore';
 import { useToastStore } from '../store/toastStore';
-import { computeTooltipPlacement } from './tooltipPlacement';
+import { computeTooltipPlacement, computeTooltipTop, TOOLTIP_EDGE_MARGIN } from './tooltipPlacement';
 import { SkillButton } from './SkillButton';
 import { canSwitch } from '../sidePanel/canSwitchSelector';
 
-const TOOLTIP_WIDTH = 260;
-const TOOLTIP_HEIGHT = 180;
+const TOOLTIP_WIDTH = 300;
+/** Height assumed before the first measurement. */
+const ESTIMATED_HEIGHT = 180;
 
 type Props = {
   nodeScreenX: number;
@@ -22,6 +23,28 @@ function TooltipInner({ nodeScreenX, nodeScreenY }: Props): JSX.Element | null {
   const [spawnError, setSpawnError] = useState<string | null>(null);
 
   const switchAllowed = canSwitch(terminalStatus);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(ESTIMATED_HEIGHT);
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+
+  // Track the rendered height (it follows the content, capped at the visible height) so the
+  // tooltip can be shifted up instead of running off the bottom of the window.
+  useLayoutEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const measure = () => setHeight(el.offsetHeight || ESTIMATED_HEIGHT);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+
+  useEffect(() => {
+    const onResize = () => setViewportHeight(window.innerHeight);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -44,13 +67,17 @@ function TooltipInner({ nodeScreenX, nodeScreenY }: Props): JSX.Element | null {
     nodeScreenX,
     nodeScreenY,
     viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight,
+    viewportHeight,
   });
 
   const left =
     placement.side === 'right' ? nodeScreenX + 16 : nodeScreenX - TOOLTIP_WIDTH - 16;
-  const top =
-    placement.vAlign === 'bottom' ? nodeScreenY : nodeScreenY - TOOLTIP_HEIGHT;
+  const top = computeTooltipTop({
+    nodeScreenY,
+    vAlign: placement.vAlign,
+    height,
+    viewportHeight,
+  });
 
   function handleSuccess() {
     setSpawnError(null);
@@ -65,13 +92,17 @@ function TooltipInner({ nodeScreenX, nodeScreenY }: Props): JSX.Element | null {
 
   return (
     <div
+      ref={boxRef}
       data-testid="node-tooltip"
       style={{
         position: 'fixed',
         left,
         top,
         width: TOOLTIP_WIDTH,
-        minHeight: TOOLTIP_HEIGHT,
+        maxHeight: viewportHeight - 2 * TOOLTIP_EDGE_MARGIN,
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
         background: '#1e1e2e',
         color: '#cdd6f4',
         border: '1px solid rgba(205,214,244,0.2)',
@@ -82,32 +113,22 @@ function TooltipInner({ nodeScreenX, nodeScreenY }: Props): JSX.Element | null {
         fontSize: '13px',
       }}
     >
-      <div style={{ fontWeight: 700, marginBottom: '4px' }}>{node.name}</div>
+      <div style={{ fontWeight: 700, marginBottom: '4px', flex: 'none' }}>{node.name}</div>
       <div
         data-testid="maturity-badge"
         style={{
-          display: 'inline-block',
+          alignSelf: 'flex-start',
           fontSize: '11px',
           padding: '1px 6px',
           borderRadius: '4px',
           background: 'rgba(205,214,244,0.15)',
           marginBottom: '8px',
+          flex: 'none',
         }}
       >
         {node.maturity}
       </div>
-      <div style={{ marginBottom: '10px', color: 'rgba(205,214,244,0.75)', fontSize: '12px' }}>
-        {node.summary}
-      </div>
-      {spawnError && (
-        <div
-          data-testid="spawn-error"
-          style={{ color: '#f38ba8', fontSize: '11px', marginBottom: '6px' }}
-        >
-          {spawnError}
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: '6px' }}>
+      <div style={{ display: 'flex', gap: '6px', flex: 'none' }}>
         <SkillButton
           skill="explore"
           label="Explore"
@@ -135,6 +156,29 @@ function TooltipInner({ nodeScreenX, nodeScreenY }: Props): JSX.Element | null {
           onSuccess={handleSuccess}
           onError={handleError}
         />
+      </div>
+      {spawnError && (
+        <div
+          data-testid="spawn-error"
+          style={{ color: '#f38ba8', fontSize: '11px', marginTop: '6px', flex: 'none' }}
+        >
+          {spawnError}
+        </div>
+      )}
+      <div
+        data-testid="tooltip-summary"
+        style={{
+          flex: '1 1 auto',
+          minHeight: 0,
+          overflowY: 'auto',
+          marginTop: '10px',
+          paddingRight: '4px',
+          color: 'rgba(205,214,244,0.75)',
+          fontSize: '12px',
+          whiteSpace: 'pre-wrap',
+        }}
+      >
+        {node.summary}
       </div>
     </div>
   );

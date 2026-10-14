@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTooltipPlacement } from '../tooltipPlacement';
+import { computeTooltipPlacement, computeTooltipTop, TOOLTIP_EDGE_MARGIN } from '../tooltipPlacement';
 
 const vw = 1000;
 const vh = 800;
@@ -46,5 +46,25 @@ describe('computeTooltipPlacement', () => {
     // y = 561 → top
     expect(computeTooltipPlacement({ nodeScreenX: 100, nodeScreenY: 561, viewportWidth: vw, viewportHeight: vh }))
       .toEqual({ side: 'right', vAlign: 'top' });
+  });
+});
+
+describe('computeTooltipTop', () => {
+  it('a small tooltip stays anchored at the node', () => {
+    expect(computeTooltipTop({ nodeScreenY: 200, vAlign: 'bottom', height: 180, viewportHeight: vh })).toBe(200);
+    expect(computeTooltipTop({ nodeScreenY: 700, vAlign: 'top', height: 180, viewportHeight: vh })).toBe(520);
+  });
+
+  it('a tall tooltip grows upward instead of running off the bottom', () => {
+    expect(computeTooltipTop({ nodeScreenY: 400, vAlign: 'bottom', height: 600, viewportHeight: vh }))
+      .toBe(vh - TOOLTIP_EDGE_MARGIN - 600);
+  });
+
+  it('never goes above the top edge', () => {
+    expect(computeTooltipTop({ nodeScreenY: 300, vAlign: 'top', height: 500, viewportHeight: vh }))
+      .toBe(TOOLTIP_EDGE_MARGIN);
+    const full = vh - 2 * TOOLTIP_EDGE_MARGIN;
+    expect(computeTooltipTop({ nodeScreenY: 600, vAlign: 'bottom', height: full, viewportHeight: vh }))
+      .toBe(TOOLTIP_EDGE_MARGIN);
   });
 });

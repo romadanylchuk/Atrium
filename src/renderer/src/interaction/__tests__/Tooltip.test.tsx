@@ -295,3 +295,21 @@ describe('Tooltip', () => {
     document.body.removeChild(fakeNode);
   });
 });
+
+describe('Tooltip layout', () => {
+  it('puts the skill buttons above a scrollable description capped at the window height', () => {
+    const fakeNode = document.createElement('div');
+    fakeNode.setAttribute('data-id', 'canvas-ui');
+    document.body.appendChild(fakeNode);
+    useAtriumStore.setState({ tooltipTarget: 'canvas-ui' });
+    render(<Tooltip />);
+
+    const tooltip = screen.getByTestId('node-tooltip');
+    const summary = screen.getByTestId('tooltip-summary');
+    const explore = screen.getByText('Explore');
+    expect(explore.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(summary.style.overflowY).toBe('auto');
+    expect(tooltip.style.maxHeight).toBe('784px');
+    document.body.removeChild(fakeNode);
+  });
+});
