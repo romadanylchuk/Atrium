@@ -59,6 +59,7 @@ export const IPC = {
   },
   shell: {
     openExternal: 'shell:openExternal',
+    openLogsFolder: 'shell:openLogsFolder',
   },
   update: {
     getStatus: 'update:getStatus',

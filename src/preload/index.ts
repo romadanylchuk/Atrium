@@ -194,6 +194,9 @@ const api: AtriumAPI = {
     openExternal(url) {
       return ipcRenderer.invoke(IPC.shell.openExternal, url);
     },
+    openLogsFolder() {
+      return ipcRenderer.invoke(IPC.shell.openLogsFolder);
+    },
   },
 
   // -------------------------------------------------------------------------

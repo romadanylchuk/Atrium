@@ -73,6 +73,8 @@ export type AtriumAPI = {
   };
   shell: {
     openExternal(url: string): Promise<void>;
+    /** Reveals the folder holding main.log (crash / error diagnostics). */
+    openLogsFolder(): Promise<void>;
   };
   update: {
     getStatus(): Promise<Result<UpdateStatus, CommonErrorCode>>;

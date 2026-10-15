@@ -10,7 +10,10 @@ import { WatcherManager } from '@main/fileSync';
 import { readAndAssembleProject } from '@main/project';
 import { flushLayoutBuffer } from '@main/ipc/flushLayoutBuffer';
 import { UpdateService, loadElectronUpdater } from '@main/updater/updateService';
+import { installCrashHandlers, watchWindow } from '@main/diagnostics/crashHandlers';
 
+// First, so anything that fails during startup is already logged.
+installCrashHandlers();
 applyFixPath();
 void resolveClaudeBin().catch(() => { /* health check will surface a proper error */ });
 
@@ -60,6 +63,7 @@ function createMainWindow(): BrowserWindow {
     },
   });
 
+  watchWindow(win);
   terminalManager.setWindow(win);
   consultationTerminalManager.setWindow(win);
   watcherManager.setWindow(win);
